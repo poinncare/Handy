@@ -73,13 +73,6 @@ mod platform {
 
     #[link(name = "ApplicationServices", kind = "framework")]
     unsafe extern "C" {
-        static kAXFocusedUIElementAttribute: CFStringRef;
-        static kAXPositionAttribute: CFStringRef;
-        static kAXRoleAttribute: CFStringRef;
-        static kAXSizeAttribute: CFStringRef;
-        static kAXSubroleAttribute: CFStringRef;
-        static kAXValueAttribute: CFStringRef;
-
         fn AXUIElementCreateSystemWide() -> AXUIElementRef;
         fn AXUIElementCopyAttributeValue(
             element: AXUIElementRef,
@@ -97,6 +90,11 @@ mod platform {
     #[link(name = "CoreFoundation", kind = "framework")]
     unsafe extern "C" {
         fn CFGetTypeID(value: CFTypeRef) -> CFTypeID;
+        fn CFStringCreateWithCString(
+            allocator: *const c_void,
+            string: *const c_char,
+            encoding: CFStringEncoding,
+        ) -> CFStringRef;
         fn CFHash(value: CFTypeRef) -> CFHashCode;
         fn CFStringGetTypeID() -> CFTypeID;
         fn CFStringGetLength(value: CFStringRef) -> CFIndex;
@@ -130,6 +128,16 @@ mod platform {
         let result =
             unsafe { AXUIElementCopyAttributeValue(element, attribute, &mut value as *mut _) };
         (result == AX_ERROR_SUCCESS && !value.is_null()).then_some(OwnedCf(value))
+    }
+
+    fn attribute(name: &'static [u8]) -> Option<OwnedCf> {
+        debug_assert_eq!(name.last(), Some(&0));
+        // AX attribute constants are CFSTR macros rather than exported linker
+        // symbols. Construct the equivalent CFString directly from the SDK name.
+        let value = unsafe {
+            CFStringCreateWithCString(ptr::null(), name.as_ptr().cast(), CF_STRING_ENCODING_UTF8)
+        };
+        (!value.is_null()).then_some(OwnedCf(value))
     }
 
     fn cf_string(value: CFTypeRef) -> Option<String> {
@@ -190,10 +198,12 @@ mod platform {
         if system_wide.0.is_null() {
             return None;
         }
-        let focused = copy_attribute(system_wide.0, unsafe { kAXFocusedUIElementAttribute })?;
+        let focused_attribute = attribute(b"AXFocusedUIElement\0")?;
+        let focused = copy_attribute(system_wide.0, focused_attribute.0)?;
 
-        let role = copy_attribute(focused.0, unsafe { kAXRoleAttribute })
-            .and_then(|value| cf_string(value.0))?;
+        let role_attribute = attribute(b"AXRole\0")?;
+        let role =
+            copy_attribute(focused.0, role_attribute.0).and_then(|value| cf_string(value.0))?;
         if !matches!(
             role.as_str(),
             "AXTextField" | "AXTextArea" | "AXComboBox" | "AXSearchField"
@@ -201,25 +211,29 @@ mod platform {
             return None;
         }
 
-        let subrole = copy_attribute(focused.0, unsafe { kAXSubroleAttribute })
-            .and_then(|value| cf_string(value.0));
+        let subrole_attribute = attribute(b"AXSubrole\0")?;
+        let subrole =
+            copy_attribute(focused.0, subrole_attribute.0).and_then(|value| cf_string(value.0));
         if subrole.as_deref() == Some("AXSecureTextField") {
             return None;
         }
 
         let mut settable = 0_u8;
+        let value_attribute = attribute(b"AXValue\0")?;
         // This checks editability without requesting the field value.
         // SAFETY: The focused AX element and exported value attribute are valid.
         if unsafe {
-            AXUIElementIsAttributeSettable(focused.0, kAXValueAttribute, &mut settable as *mut u8)
+            AXUIElementIsAttributeSettable(focused.0, value_attribute.0, &mut settable as *mut u8)
         } != AX_ERROR_SUCCESS
             || settable == 0
         {
             return None;
         }
 
-        let position = point(copy_attribute(focused.0, unsafe { kAXPositionAttribute })?.0)?;
-        let size = size(copy_attribute(focused.0, unsafe { kAXSizeAttribute })?.0)?;
+        let position_attribute = attribute(b"AXPosition\0")?;
+        let size_attribute = attribute(b"AXSize\0")?;
+        let position = point(copy_attribute(focused.0, position_attribute.0)?.0)?;
+        let size = size(copy_attribute(focused.0, size_attribute.0)?.0)?;
         let bounds = ScreenRect {
             x: position.x,
             y: position.y,
