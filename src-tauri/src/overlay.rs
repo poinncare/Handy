@@ -84,8 +84,9 @@ const OVERLAY_HEIGHT: f64 = 36.0;
 const OVERLAY_STREAM_WIDTH: f64 = 400.0;
 const OVERLAY_STREAM_HEIGHT: f64 = 120.0;
 
-const MEMORY_TIP_WIDTH: f64 = 280.0;
-const MEMORY_TIP_HEIGHT: f64 = 44.0;
+const MEMORY_TIP_WIDTH: f64 = 420.0;
+const MEMORY_TIP_HEIGHT: f64 = 48.0;
+const MEMORY_TIP_GAP: f64 = 14.0;
 // Keep in sync with .memory-highlight-stage padding. The transparent margin
 // gives the CSS shadow room while the halo border lands on the input bounds.
 const MEMORY_FOCUS_PADDING: f64 = 32.0;
@@ -322,6 +323,20 @@ fn padded_focus_bounds(
         y: bounds.y - padding,
         width: bounds.width + padding * 2.0,
         height: bounds.height + padding * 2.0,
+    }
+}
+
+fn memory_tip_bounds(
+    focused_bounds: crate::focused_input::ScreenRect,
+    width: f64,
+    height: f64,
+    gap: f64,
+) -> crate::focused_input::ScreenRect {
+    crate::focused_input::ScreenRect {
+        x: focused_bounds.x + (focused_bounds.width - width) / 2.0,
+        y: focused_bounds.y - height - gap,
+        width,
+        height,
     }
 }
 
@@ -851,7 +866,80 @@ pub fn hide_recording_overlay(app_handle: &AppHandle) {
     }
 }
 
-pub fn show_memory_tip_overlay(app_handle: &AppHandle) {
+fn position_memory_tip_overlay(
+    _app_handle: &AppHandle,
+    window: &tauri::webview::WebviewWindow,
+    focused_bounds: crate::focused_input::ScreenRect,
+) {
+    #[cfg(target_os = "macos")]
+    {
+        let bounds = memory_tip_bounds(
+            focused_bounds,
+            MEMORY_TIP_WIDTH,
+            MEMORY_TIP_HEIGHT,
+            MEMORY_TIP_GAP,
+        );
+        let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize {
+            width: bounds.width,
+            height: bounds.height,
+        }));
+        let _ = window.set_position(tauri::Position::Logical(tauri::LogicalPosition {
+            x: bounds.x,
+            y: bounds.y,
+        }));
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let scale = physical_focus_padding(_app_handle, focused_bounds) / MEMORY_FOCUS_PADDING;
+        let bounds = memory_tip_bounds(
+            focused_bounds,
+            MEMORY_TIP_WIDTH * scale,
+            MEMORY_TIP_HEIGHT * scale,
+            MEMORY_TIP_GAP * scale,
+        );
+        if let Err(error) = place_windows_memory_focus(window, bounds) {
+            log::error!("Failed to place memory tip above focused input: {error}");
+        }
+    }
+
+    #[cfg(all(target_os = "linux", not(target_os = "windows")))]
+    {
+        if crate::utils::is_wayland() {
+            let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize {
+                width: MEMORY_TIP_WIDTH,
+                height: MEMORY_TIP_HEIGHT,
+            }));
+            if let Some((x, y)) =
+                calculate_overlay_position(_app_handle, MEMORY_TIP_WIDTH, MEMORY_TIP_HEIGHT)
+            {
+                let _ =
+                    window.set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y }));
+            }
+        } else {
+            let scale = physical_focus_padding(_app_handle, focused_bounds) / MEMORY_FOCUS_PADDING;
+            let bounds = memory_tip_bounds(
+                focused_bounds,
+                MEMORY_TIP_WIDTH * scale,
+                MEMORY_TIP_HEIGHT * scale,
+                MEMORY_TIP_GAP * scale,
+            );
+            let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(
+                bounds.width.round().max(1.0) as u32,
+                bounds.height.round().max(1.0) as u32,
+            )));
+            let _ = window.set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(
+                bounds.x.round() as i32,
+                bounds.y.round() as i32,
+            )));
+        }
+    }
+}
+
+pub fn show_memory_tip_overlay(
+    app_handle: &AppHandle,
+    focused_bounds: crate::focused_input::ScreenRect,
+) {
     MEMORY_TIP_VISIBILITY_GENERATION.fetch_add(1, Ordering::Relaxed);
     let Some(window) = app_handle.get_webview_window("memory_tip_overlay") else {
         return;
@@ -860,30 +948,21 @@ pub fn show_memory_tip_overlay(app_handle: &AppHandle) {
     #[cfg(target_os = "linux")]
     update_gtk_layer_shell_anchors(&window);
 
-    #[cfg(not(target_os = "windows"))]
-    {
-        let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize {
-            width: MEMORY_TIP_WIDTH,
-            height: MEMORY_TIP_HEIGHT,
-        }));
-        if let Some((x, y)) =
-            calculate_overlay_position(app_handle, MEMORY_TIP_WIDTH, MEMORY_TIP_HEIGHT)
-        {
-            let _ = window.set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y }));
-        }
-    }
-
-    #[cfg(target_os = "windows")]
-    if let Err(error) =
-        place_windows_overlay(app_handle, &window, MEMORY_TIP_WIDTH, MEMORY_TIP_HEIGHT)
-    {
-        log::error!("Failed to place memory tip overlay: {error}");
-    }
+    position_memory_tip_overlay(app_handle, &window, focused_bounds);
 
     let _ = window.show();
     #[cfg(target_os = "windows")]
     force_overlay_topmost(&window);
     let _ = app_handle.emit_to("memory_tip_overlay", "show-overlay", "memory-tip");
+}
+
+pub fn move_memory_tip_overlay(
+    app_handle: &AppHandle,
+    focused_bounds: crate::focused_input::ScreenRect,
+) {
+    if let Some(window) = app_handle.get_webview_window("memory_tip_overlay") {
+        position_memory_tip_overlay(app_handle, &window, focused_bounds);
+    }
 }
 
 pub fn show_memory_focus_overlay(
@@ -979,6 +1058,15 @@ pub fn hide_memory_focus_overlay(app_handle: &AppHandle) {
     if let Some(window) = app_handle.get_webview_window("memory_focus_overlay") {
         let _ = window.hide();
     }
+}
+
+pub fn hide_memory_training_overlays_immediately(app_handle: &AppHandle) {
+    MEMORY_TIP_VISIBILITY_GENERATION.fetch_add(1, Ordering::Relaxed);
+    if let Some(window) = app_handle.get_webview_window("memory_tip_overlay") {
+        let _ = app_handle.emit_to("memory_tip_overlay", "hide-overlay", ());
+        let _ = window.hide();
+    }
+    hide_memory_focus_overlay(app_handle);
 }
 
 pub fn hide_memory_training_overlays(app_handle: &AppHandle) {
@@ -1090,6 +1178,21 @@ mod tests {
         assert_eq!(padded.y, -55.0);
         assert_eq!(padded.width, 210.0);
         assert_eq!(padded.height, 40.0);
+    }
+
+    #[test]
+    fn memory_tip_is_centered_above_the_focused_input() {
+        let focused = crate::focused_input::ScreenRect {
+            x: 100.0,
+            y: 300.0,
+            width: 600.0,
+            height: 48.0,
+        };
+        let tip = memory_tip_bounds(focused, 420.0, 48.0, 14.0);
+        assert_eq!(tip.x, 190.0);
+        assert_eq!(tip.y, 238.0);
+        assert_eq!(tip.width, 420.0);
+        assert_eq!(tip.height, 48.0);
     }
 
     #[cfg(target_os = "windows")]

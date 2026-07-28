@@ -28,6 +28,40 @@ type OverlayState =
 // every overlay form). Mic levels arrive as 16 FFT buckets; we take the first N.
 const WAVE_BARS = 9;
 
+type ShortcutKey = {
+  label: string;
+  side?: "L" | "R";
+};
+
+const shortcutKey = (rawKey: string): ShortcutKey => {
+  const normalized = rawKey.trim().toLowerCase();
+  const side = normalized.endsWith("_right")
+    ? "R"
+    : normalized.endsWith("_left")
+      ? "L"
+      : undefined;
+  const key = normalized.replace(/_(left|right)$/, "");
+  const labels: Record<string, string> = {
+    alt: "Alt",
+    command: "⌘",
+    control: "Ctrl",
+    ctrl: "Ctrl",
+    enter: "↵",
+    escape: "Esc",
+    meta: "⌘",
+    option: "⌥",
+    return: "↵",
+    shift: "⇧",
+    space: "Space",
+    super: "⌘",
+  };
+
+  return { label: labels[key] ?? key.toUpperCase(), side };
+};
+
+const shortcutKeys = (binding: string): ShortcutKey[] =>
+  binding.split("+").filter(Boolean).map(shortcutKey);
+
 const RecordingOverlay: React.FC = () => {
   const { t } = useTranslation();
   const [isVisible, setIsVisible] = useState(false);
@@ -46,6 +80,7 @@ const RecordingOverlay: React.FC = () => {
   // Overlay placement (top vs bottom of the screen). The Live panel grows downward
   // from a top overlay (oldest line under the pill) and upward from a bottom one.
   const [position, setPosition] = useState<"top" | "bottom">("bottom");
+  const [memoryShortcut, setMemoryShortcut] = useState<ShortcutKey[]>([]);
   // True once live text overflows the cap. A top overlay fades its top edge only
   // while overflowing, so the resting first line stays crisp flush under the pill.
   const [overflowing, setOverflowing] = useState(false);
@@ -87,6 +122,11 @@ const RecordingOverlay: React.FC = () => {
           if (settings.status === "ok") {
             setPosition(
               settings.data.overlay_position === "top" ? "top" : "bottom",
+            );
+            setMemoryShortcut(
+              shortcutKeys(
+                settings.data.bindings?.transcribe?.current_binding ?? "",
+              ),
             );
           }
         } catch {
@@ -244,14 +284,35 @@ const RecordingOverlay: React.FC = () => {
     return (
       <div dir={direction} className="memory-tip-stage">
         <div
-          className={`memory-tip-overlay ${isVisible ? "fade-in" : ""}`}
+          className={`memory-tip-layout ${isVisible ? "fade-in" : ""}`}
           role="status"
           aria-live="polite"
         >
-          <span className="memory-tip-icon" aria-hidden="true">
-            <MicrophoneIcon width={19} height={19} />
-          </span>
-          <span className="memory-tip-text">{t("overlay.memoryTip")}</span>
+          <div className="memory-tip-message">
+            <span className="memory-tip-icon" aria-hidden="true">
+              <MicrophoneIcon width={19} height={19} />
+            </span>
+            <span className="memory-tip-text">{t("overlay.memoryTip")}</span>
+          </div>
+          {memoryShortcut.length > 0 && (
+            <div className="memory-tip-shortcut" dir="ltr">
+              {memoryShortcut.map((key, index) => (
+                <React.Fragment
+                  key={`${key.label}-${key.side ?? "any"}-${index}`}
+                >
+                  {index > 0 && (
+                    <span className="memory-tip-plus" aria-hidden="true">
+                      +
+                    </span>
+                  )}
+                  <kbd className="memory-tip-key">
+                    <span>{key.label}</span>
+                    {key.side && <small aria-hidden="true">{key.side}</small>}
+                  </kbd>
+                </React.Fragment>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     );

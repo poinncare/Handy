@@ -288,6 +288,11 @@ impl TypingMonitor {
         self.inner.suppression_epoch.fetch_add(1, Ordering::SeqCst);
         crate::overlay::hide_memory_training_overlays(app);
     }
+
+    fn request_recording_suppression(&self, app: &AppHandle) {
+        self.inner.suppression_epoch.fetch_add(1, Ordering::SeqCst);
+        crate::overlay::hide_memory_training_overlays_immediately(app);
+    }
 }
 
 pub fn register(app: &AppHandle) {
@@ -330,9 +335,9 @@ pub fn set_threshold(app: &AppHandle, seconds: u64) {
 
 pub fn suppress_for_recording(app: &AppHandle) {
     if let Some(monitor) = app.try_state::<TypingMonitor>() {
-        monitor.request_suppression(app);
+        monitor.request_recording_suppression(app);
     } else {
-        crate::overlay::hide_memory_training_overlays(app);
+        crate::overlay::hide_memory_training_overlays_immediately(app);
     }
 }
 
@@ -423,11 +428,13 @@ fn apply_action(app: &AppHandle, action: MachineAction) {
     match action {
         MachineAction::None => {}
         MachineAction::Show(bounds) => {
-            crate::overlay::show_memory_tip_overlay(app);
             crate::overlay::show_memory_focus_overlay(app, bounds);
+            // Show the reminder last so its separate panel sits above the glow.
+            crate::overlay::show_memory_tip_overlay(app, bounds);
         }
         MachineAction::Move(bounds) => {
             crate::overlay::show_memory_focus_overlay(app, bounds);
+            crate::overlay::move_memory_tip_overlay(app, bounds);
         }
         MachineAction::Hide => crate::overlay::hide_memory_training_overlays(app),
     }

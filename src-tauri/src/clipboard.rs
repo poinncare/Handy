@@ -925,6 +925,19 @@ fn paste_via_clipboard(
 
     std::thread::sleep(Duration::from_millis(paste_delay_ms));
 
+    #[cfg(not(target_os = "linux"))]
+    if !matches!(app_handle.clipboard().read_text(), Ok(current) if current == text) {
+        warn!("Clipboard changed before paste dispatch; restoring the current transcription");
+        clipboard
+            .write_text(text)
+            .map_err(|error| format!("Failed to restore transcription before paste: {error}"))?;
+        if !wait_for_clipboard_publication(app_handle, text, Duration::from_millis(500)) {
+            return Err(
+                "Clipboard did not retain the transcription immediately before paste".into(),
+            );
+        }
+    }
+
     #[cfg(target_os = "linux")]
     if let Some(event) = x11_waiter.event_before_paste() {
         return Ok(ClipboardPasteOutcome::Unconfirmed(format!(
