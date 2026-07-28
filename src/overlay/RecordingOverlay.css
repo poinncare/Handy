@@ -20,16 +20,12 @@
   --s-border: color-mix(in srgb, var(--color-mid-gray) 22%, transparent);
   --s-hair: color-mix(in srgb, var(--color-mid-gray) 12%, transparent);
 
-  /* Card geometry — single source of truth for the visible overlay sizes. The
-     native overlay window (overlay.rs) is sized from these: it must be at least
-     the card's max footprint (--ov-work-w for compact, --ov-open-w for Live),
-     since the card is anchored flush to the screen edge in CSS. Keep overlay.rs
-     in sync when these change. */
-  --ov-rest-w: 172px; /* resting compact pill (minimal, recording) -- roomy enough
-                         for the English working label before the grow starts */
+  /* Live-card geometry. The classic compact indicator below has its historical
+     fixed 172×36 footprint; overlay.rs keeps separate native sizes for it and
+     this streaming panel. */
   --ov-pill-w: 184px; /* base width / Live pill before it opens or collapses */
   --ov-work-w: 216px; /* working pill (transcribing / polishing) -- wide enough to
-                         center longer labels; shared by Live (collapsed) + minimal */
+                         center longer labels in collapsed Live mode */
   --ov-open-w: 392px; /* Live panel, expanded */
   --ov-base-h: 40px; /* control-row height (.sbase) */
   --ov-cap-max-h: 64px; /* max height of the scrolling live-text region */
@@ -52,10 +48,9 @@
 }
 
 /* ============================================================
-   Unified overlay stage — one fixed, transparent container shared by the compact
-   pill and the Live panel (both render the same `.scard` base). The card is
-   anchored flush to the screen-edge side (bottom by default, top when placed up
-   top) and centered horizontally, so the visible card sits exactly
+   Live overlay stage — a fixed, transparent container for the streaming panel.
+   The card is anchored flush to the screen-edge side (bottom by default, top
+   when placed up top) and centered horizontally, so the visible card sits exactly
    OVERLAY_*_OFFSET from the screen edge regardless of window height — only the
    offsets in overlay.rs move it. Pops scale from that edge, so the card is never
    drawn past it (matters for the 4px top offset on Windows/Linux).
@@ -70,16 +65,6 @@
 }
 .ov-stage.top {
   align-items: flex-start; /* top placement: flush to the top edge */
-}
-
-/* Compact pill: fade the whole container in/out (the pill itself never pops or
-   morphs). */
-.ov-fade {
-  opacity: 0;
-  transition: opacity 200ms ease-out;
-}
-.ov-fade.show {
-  opacity: 1;
 }
 
 /* Top placement, Live panel: stack the control pill above the text region so the
@@ -159,19 +144,6 @@
 .scard.working {
   width: var(--ov-work-w);
   border-radius: 18px;
-}
-
-/* Compact form: two fixed widths so the recording→working change is an animatable
-   width transition (intrinsic max-content can't be transitioned, and every label
-   is short enough to fit the resting pill, so content-sizing produced no visible
-   grow). The resting pill hugs the waveform; the working pill is roomy enough to
-   center the longest label — the .swork-label ellipsis is only a safety net past it. */
-.scard.compact {
-  animation: none;
-  width: var(--ov-rest-w);
-}
-.scard.compact.cworking {
-  width: var(--ov-work-w);
 }
 
 /* text region — auto-height open via grid-rows trick; region fades as a whole */
@@ -366,4 +338,113 @@
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* ============================================================
+   Classic compact indicator
+
+   Restored from bff4db7, the main-line commit immediately before the 0.9
+   overlay redesign. Its state/event plumbing remains current; this block
+   intentionally preserves the old fixed geometry and palette.
+   ============================================================ */
+.recording-overlay {
+  height: 36px;
+  width: 172px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  padding: 6px;
+  background: #000000cc;
+  border-radius: 18px;
+  opacity: 0;
+  transition: opacity 300ms ease-out;
+  box-sizing: border-box;
+}
+
+.overlay-left {
+  display: flex;
+  align-items: center;
+}
+
+.overlay-middle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+.overlay-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.bars-container {
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  gap: 3px;
+  height: 24px;
+  overflow: hidden;
+}
+
+.bar {
+  width: 6px;
+  min-height: 4px;
+  max-height: 20px;
+  border-radius: 2px;
+  background: #ffe5ee;
+  transition:
+    height 60ms ease-out,
+    opacity 120ms ease-out;
+}
+
+.recording-overlay.fade-in {
+  opacity: 1;
+}
+
+.transcribing-text {
+  overflow: hidden;
+  color: white;
+  font-family: var(--s-font);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  animation: transcribing-pulse 1.5s infinite ease-in-out;
+}
+
+@keyframes transcribing-pulse {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.cancel-button {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    background-color 150ms ease-out,
+    transform 100ms ease-out;
+}
+
+.cancel-button:hover {
+  background: #faa2ca33;
+  transform: scale(1.05);
+}
+
+.cancel-button:active {
+  transform: scale(0.95);
 }

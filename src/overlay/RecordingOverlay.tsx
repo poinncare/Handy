@@ -1,6 +1,11 @@
 import { listen } from "@tauri-apps/api/event";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import {
+  CancelIcon,
+  MicrophoneIcon,
+  TranscriptionIcon,
+} from "../components/icons";
 import "./RecordingOverlay.css";
 import { commands, events } from "@/bindings";
 import type {
@@ -259,24 +264,50 @@ const RecordingOverlay: React.FC = () => {
     );
   }
 
-  // ---- Minimal overlay: exactly one row at a time — waveform (recording), or a
-  // spinner + label (transcribing / processing). Never both. The pill animates its
-  // width between them; the cancel button is in both rows so it stays put.
-  const working = state === "transcribing" || state === "processing";
-  const workLabel =
-    state === "processing"
-      ? t("overlay.processing")
-      : t("overlay.transcribing");
-
+  // ---- Classic compact overlay (the pre-0.9 recording indicator) ----
+  // Keep the current state machine and cancellation behavior, but render the
+  // original 172×36 black pill, icons, and pink level bars.
   return (
     <div
       dir={direction}
-      className={`ov-stage ${position} ov-fade ${isVisible ? "show" : ""}`}
+      className={`recording-overlay ${isVisible ? "fade-in" : ""}`}
     >
-      <div
-        className={`scard compact ${working && isVisible ? "cworking" : ""}`}
-      >
-        {working ? workingRow(workLabel, true) : listeningRow(false, true)}
+      <div className="overlay-left">
+        {state === "recording" ? <MicrophoneIcon /> : <TranscriptionIcon />}
+      </div>
+
+      <div className="overlay-middle">
+        {state === "recording" && (
+          <div className="bars-container">
+            {levels.map((level, index) => (
+              <div
+                key={index}
+                className="bar"
+                style={{
+                  height: `${Math.min(20, 4 + Math.pow(level, 0.7) * 16)}px`,
+                  opacity: Math.max(0.2, level * 1.7),
+                }}
+              />
+            ))}
+          </div>
+        )}
+        {state === "transcribing" && (
+          <div className="transcribing-text">{t("overlay.transcribing")}</div>
+        )}
+        {state === "processing" && (
+          <div className="transcribing-text">{t("overlay.processing")}</div>
+        )}
+      </div>
+
+      <div className="overlay-right">
+        <button
+          type="button"
+          className="cancel-button"
+          aria-label="cancel"
+          onClick={() => commands.cancelOperation()}
+        >
+          <CancelIcon />
+        </button>
       </div>
     </div>
   );

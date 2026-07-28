@@ -35,16 +35,14 @@ tauri_panel! {
 
 // Native overlay window sizes (logical points). One window is reused for every
 // state and resized in `show_overlay_state`; each size need only be at least as
-// large as the card it hosts (the `--ov-*` vars in RecordingOverlay.css). The
-// card is CSS-anchored flush to the screen edge, so window height doesn't move
-// where the card sits — only OVERLAY_TOP_OFFSET / OVERLAY_BOTTOM_OFFSET do. Keep
-// these in sync with the CSS card geometry.
+// large as the card it hosts. The classic indicator fills its compact window;
+// the streaming card is CSS-anchored flush to the screen edge, so window height
+// doesn't move where it sits. Keep these in sync with RecordingOverlay.css.
 //
-// Compact overlay (Minimal / transcribing / processing): the 40h pill animates
-// width from 172 (--ov-rest-w) to 216 (--ov-work-w) and expands from center, so
-// the window must fit the widest state plus a little slack.
-const OVERLAY_WIDTH: f64 = 256.0;
-const OVERLAY_HEIGHT: f64 = 46.0;
+// Classic compact overlay (recording / transcribing / processing). These match
+// the fixed dimensions used by the pre-0.9 recording indicator.
+const OVERLAY_WIDTH: f64 = 172.0;
+const OVERLAY_HEIGHT: f64 = 36.0;
 
 // Actual is 394x118, just a little extra
 const OVERLAY_STREAM_WIDTH: f64 = 400.0;
@@ -707,7 +705,7 @@ mod tests {
                 OVERLAY_HEIGHT,
                 OverlayPosition::Bottom,
             ),
-            (3648, 2031, 384, 69)
+            (3711, 2046, 258, 54)
         );
         assert_eq!(
             windows_overlay_bounds(
@@ -718,7 +716,7 @@ mod tests {
                 OVERLAY_HEIGHT,
                 OverlayPosition::Top,
             ),
-            (3648, 6, 384, 69)
+            (3711, 6, 258, 54)
         );
     }
 
