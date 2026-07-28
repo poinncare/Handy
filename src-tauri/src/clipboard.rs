@@ -30,9 +30,6 @@ mod macos_paste_verification {
 
     #[link(name = "ApplicationServices", kind = "framework")]
     unsafe extern "C" {
-        static kAXFocusedUIElementAttribute: CFStringRef;
-        static kAXValueAttribute: CFStringRef;
-
         fn AXUIElementCreateSystemWide() -> AXUIElementRef;
         fn AXUIElementCopyAttributeValue(
             element: AXUIElementRef,
@@ -44,6 +41,11 @@ mod macos_paste_verification {
     #[link(name = "CoreFoundation", kind = "framework")]
     unsafe extern "C" {
         fn CFGetTypeID(value: CFTypeRef) -> CFTypeID;
+        fn CFStringCreateWithCString(
+            allocator: *const c_void,
+            string: *const c_char,
+            encoding: CFStringEncoding,
+        ) -> CFStringRef;
         fn CFStringGetTypeID() -> CFTypeID;
         fn CFStringGetLength(value: CFStringRef) -> CFIndex;
         fn CFStringGetMaximumSizeForEncoding(
@@ -79,6 +81,16 @@ mod macos_paste_verification {
         (result == AX_ERROR_SUCCESS && !value.is_null()).then_some(OwnedCf(value))
     }
 
+    fn attribute(name: &'static [u8]) -> Option<OwnedCf> {
+        debug_assert_eq!(name.last(), Some(&0));
+        // AX attribute constants are CFSTR macros rather than exported linker
+        // symbols. Construct the equivalent CFString directly from the SDK name.
+        let value = unsafe {
+            CFStringCreateWithCString(ptr::null(), name.as_ptr().cast(), CF_STRING_ENCODING_UTF8)
+        };
+        (!value.is_null()).then_some(OwnedCf(value))
+    }
+
     fn cf_string_to_rust(value: CFTypeRef) -> Option<String> {
         // SAFETY: Type IDs can be queried for any non-null CoreFoundation object.
         if unsafe { CFGetTypeID(value) } != unsafe { CFStringGetTypeID() } {
@@ -112,8 +124,10 @@ mod macos_paste_verification {
         if system_wide.0.is_null() {
             return None;
         }
-        let focused = copy_attribute(system_wide.0, unsafe { kAXFocusedUIElementAttribute })?;
-        let value = copy_attribute(focused.0, unsafe { kAXValueAttribute })?;
+        let focused_attribute = attribute(b"AXFocusedUIElement\0")?;
+        let value_attribute = attribute(b"AXValue\0")?;
+        let focused = copy_attribute(system_wide.0, focused_attribute.0)?;
+        let value = copy_attribute(focused.0, value_attribute.0)?;
         cf_string_to_rust(value.0)
     }
 }
