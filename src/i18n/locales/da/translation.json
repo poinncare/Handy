@@ -364,6 +364,10 @@
         "remove": "Fjern {{word}}",
         "duplicate": "\"{{word}}\" findes allerede"
       },
+      "removeFillerSounds": {
+        "label": "Remove filler sounds",
+        "description": "Remove sounds such as repeated ah, uh, um, and er from transcriptions."
+      },
       "voiceActivityDetection": {
         "title": "Stemmeaktivitetsdetektion",
         "description": "Filtrer stilhed fra optagelser. Streaming-modeller bruger en længere VAD-hale; deaktivering af VAD optager rå lyd."

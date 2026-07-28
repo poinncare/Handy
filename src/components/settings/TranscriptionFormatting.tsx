@@ -16,6 +16,15 @@ export const TranscriptionFormatting: React.FC<TranscriptionFormattingProps> =
     return (
       <>
         <ToggleSwitch
+          checked={getSetting("remove_filler_sounds") ?? true}
+          onChange={(enabled) => updateSetting("remove_filler_sounds", enabled)}
+          isUpdating={isUpdating("remove_filler_sounds")}
+          label={t("settings.advanced.removeFillerSounds.label")}
+          description={t("settings.advanced.removeFillerSounds.description")}
+          descriptionMode={descriptionMode}
+          grouped={grouped}
+        />
+        <ToggleSwitch
           checked={getSetting("lowercase_first_letter") ?? true}
           onChange={(enabled) =>
             updateSetting("lowercase_first_letter", enabled)

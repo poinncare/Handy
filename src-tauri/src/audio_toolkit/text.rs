@@ -1,6 +1,7 @@
 use natural::phonetics::soundex;
 use once_cell::sync::Lazy;
 use regex::Regex;
+use std::ops::Range;
 use strsim::levenshtein;
 
 /// Builds an n-gram string by cleaning and concatenating words
@@ -267,16 +268,16 @@ fn extract_punctuation(word: &str) -> (&str, &str) {
 
 /// Returns filler words appropriate for the given language code.
 ///
-/// Some words like "um" and "ha" are real words in certain languages
-/// (e.g., Portuguese "um" = "a/an", Spanish "ha" = "has"), so we only
-/// include them as fillers for languages where they are truly fillers.
+/// Some sounds are meaningful words in other languages (for example,
+/// Portuguese "um" = "a/an" and Russian "и" = "and"), so ordinary standalone
+/// tokens are only removed when the transcription language makes that safe.
 fn get_filler_words_for_language(lang: &str) -> &'static [&'static str] {
     let base_lang = lang.split(&['-', '_'][..]).next().unwrap_or(lang);
 
     match base_lang {
         "en" => &[
-            "uh", "um", "uhm", "umm", "uhh", "uhhh", "ah", "hmm", "hm", "mmm", "mm", "mh", "eh",
-            "ehh", "ha",
+            "uh", "um", "uhm", "umm", "uhh", "uhhh", "erm", "err", "er", "ah", "ahh", "hmm", "hm",
+            "mmm", "mm", "mh",
         ],
         "es" => &["ehm", "mmm", "hmm", "hm"],
         "pt" => &["ahm", "hmm", "mmm", "hm"],
@@ -286,105 +287,241 @@ fn get_filler_words_for_language(lang: &str) -> &'static [&'static str] {
         "cs" => &["ehm", "hmm", "mmm", "hm"],
         "pl" => &["hmm", "mmm", "hm"],
         "tr" => &["hmm", "mmm", "hm"],
-        "ru" => &["хм", "ммм", "hmm", "mmm"],
-        "uk" => &["хм", "ммм", "hmm", "mmm"],
+        "ru" => &["эм", "э", "хм", "мм", "ммм", "hmm", "mmm"],
+        "uk" => &["ем", "е", "хм", "мм", "ммм", "hmm", "mmm"],
         "ar" => &["hmm", "mmm"],
         "ja" => &["hmm", "mmm"],
         "ko" => &["hmm", "mmm"],
         "vi" => &["hmm", "mmm", "hm"],
         "zh" => &["hmm", "mmm"],
-        // Conservative universal fallback (no "um", "eh", "ha")
-        _ => &[
-            "uh", "uhm", "umm", "uhh", "uhhh", "ah", "hmm", "hm", "mmm", "mm", "mh", "ehh",
-        ],
+        // Conservative fallback for auto-detect and unknown languages. Avoid
+        // ambiguous standalone words such as English "um"/"er", Portuguese
+        // "um", and Russian "а"/"и". Repeated sound sequences are handled
+        // separately below and are safe across languages.
+        _ => &["uh", "uhm", "uhh", "uhhh", "hmm", "mmm"],
     }
 }
 
-static MULTI_SPACE_PATTERN: Lazy<Regex> = Lazy::new(|| Regex::new(r"\s{2,}").unwrap());
+static REPEATED_FILLER_SOUND_PATTERN: Lazy<Regex> = Lazy::new(|| {
+    // Three or more filler syllables separated by whitespace or any common
+    // hyphen/dash. This covers "uh uh uh", "um-um-um", and Russian
+    // "а-а-а"/"э-э-э"/"и-и-и" without treating a single "а" or "и" as filler.
+    // Each branch repeats the same sound family. A shared alternation at every
+    // position would also match meaningful mixed tokens such as Russian "а и а".
+    let separator = r"(?:[ \t]*[-‐‑‒–—][ \t]*|[ \t]+)";
+    let repeated_sounds = [
+        r"a+h+", r"u+h+", r"u+m+", r"e+r+", r"а+", r"э+", r"и+", r"эм+",
+    ]
+    .map(|sound| format!(r"{sound}(?:{separator}{sound}){{2,}}"))
+    .join("|");
+    Regex::new(&format!(r"(?iu)\b(?:{repeated_sounds})\b")).unwrap()
+});
 
-/// Collapses repeated words (3+ repetitions) to a single instance.
-/// E.g., "wh wh wh wh" -> "wh", "I I I I" -> "I"
-fn collapse_stutters(text: &str) -> String {
-    let words: Vec<&str> = text.split_whitespace().collect();
-    if words.is_empty() {
-        return text.to_string();
+static ELONGATED_FILLER_SOUND_PATTERN: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r"(?iu)\b(?:a{3,}h*|ah{2,}|u{2,}h+|uh{2,}|u{2,}m+|um{2,}|e{2,}r+|er{2,}|а{3,}|э{2,}|и{3,}|м{3,}|эм{2,})\b",
+    )
+    .unwrap()
+});
+
+static MULTI_HORIZONTAL_SPACE_PATTERN: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"[^\S\r\n]{2,}").unwrap());
+
+fn is_uppercase_acronym(text: &str) -> bool {
+    let letters: Vec<char> = text.chars().collect();
+    let looks_like_acronym = letters.len() >= 2
+        && letters.iter().all(|character| character.is_alphabetic())
+        && letters.iter().all(|character| character.is_uppercase());
+
+    // Retain the established cleanup for these unambiguous filler renderings;
+    // other all-uppercase tokens are treated conservatively as abbreviations.
+    looks_like_acronym && !matches!(text, "UH" | "UHM")
+}
+
+fn collect_removal_matches(
+    ranges: &mut Vec<Range<usize>>,
+    text: &str,
+    pattern: &Regex,
+    preserve_uppercase_acronyms: bool,
+) {
+    ranges.extend(pattern.find_iter(text).filter_map(|matched| {
+        (!preserve_uppercase_acronyms || !is_uppercase_acronym(matched.as_str()))
+            .then(|| matched.range())
+    }));
+}
+
+fn is_soft_punctuation(character: char) -> bool {
+    matches!(character, ',' | '，' | ';' | '；' | ':' | '：')
+}
+
+fn is_sentence_punctuation(character: char) -> bool {
+    matches!(character, '.' | '!' | '?' | '。' | '！' | '？')
+}
+
+fn trim_horizontal_start(text: &str) -> &str {
+    text.trim_start_matches(|character| matches!(character, ' ' | '\t'))
+}
+
+fn trim_horizontal_end(text: &str) -> &str {
+    text.trim_end_matches(|character| matches!(character, ' ' | '\t'))
+}
+
+/// Removes punctuation and spacing made redundant at one concrete filler span.
+///
+/// Text away from the boundary is copied verbatim, so meaningful constructs such
+/// as `std::io` and leading punctuation are never normalized as a side effect.
+fn clean_removed_boundary(text: &mut String, boundary: usize) {
+    let original_left = &text[..boundary];
+    let original_right = &text[boundary..];
+    let mut left = trim_horizontal_end(original_left);
+    let mut right = trim_horizontal_start(original_right);
+    let had_horizontal_gap =
+        left.len() != original_left.len() || right.len() != original_right.len();
+
+    let mut removed_right_soft_punctuation = false;
+    while let Some(character) = right.chars().next() {
+        if !is_soft_punctuation(character) {
+            break;
+        }
+        right = trim_horizontal_start(&right[character.len_utf8()..]);
+        removed_right_soft_punctuation = true;
     }
 
-    let mut result: Vec<&str> = Vec::new();
-    let mut i = 0;
+    if left.is_empty() {
+        *text = right.to_string();
+        return;
+    }
 
-    while i < words.len() {
-        let word = words[i];
-        let word_lower = word.to_lowercase();
-
-        if word_lower.chars().all(|c| c.is_alphabetic()) {
-            // Count consecutive repetitions (case-insensitive)
-            let mut count = 1;
-            while i + count < words.len() && words[i + count].to_lowercase() == word_lower {
-                count += 1;
+    if right.is_empty() {
+        if let Some((index, character)) = left.char_indices().next_back() {
+            if is_soft_punctuation(character) {
+                left = trim_horizontal_end(&left[..index]);
             }
+        }
+        *text = left.to_string();
+        return;
+    }
 
-            // If 3+ repetitions, collapse to single instance
-            if count >= 3 {
-                result.push(word);
-                i += count;
-            } else {
-                result.push(word);
-                i += 1;
+    if right.chars().next().is_some_and(is_sentence_punctuation) {
+        if let Some((index, character)) = left.char_indices().next_back() {
+            if is_soft_punctuation(character) {
+                left = trim_horizontal_end(&left[..index]);
             }
-        } else {
-            result.push(word);
-            i += 1;
         }
     }
 
-    result.join(" ")
+    let right_starts_with_sentence_punctuation =
+        right.chars().next().is_some_and(is_sentence_punctuation);
+    let boundary_needs_space = (had_horizontal_gap || removed_right_soft_punctuation)
+        && !right_starts_with_sentence_punctuation
+        && !left.ends_with('\r')
+        && !left.ends_with('\n')
+        && !right.starts_with('\r')
+        && !right.starts_with('\n');
+
+    let mut cleaned =
+        String::with_capacity(left.len() + right.len() + usize::from(boundary_needs_space));
+    cleaned.push_str(left);
+    if boundary_needs_space {
+        cleaned.push(' ');
+    }
+    cleaned.push_str(right);
+    *text = cleaned;
 }
 
-/// Filters transcription output by removing filler words and stutter artifacts.
+fn remove_ranges_with_boundary_cleanup(text: &str, mut ranges: Vec<Range<usize>>) -> String {
+    ranges.sort_unstable_by_key(|range| range.start);
+    let mut merged: Vec<Range<usize>> = Vec::with_capacity(ranges.len());
+    for range in ranges {
+        if let Some(previous) = merged.last_mut() {
+            if range.start <= previous.end {
+                previous.end = previous.end.max(range.end);
+                continue;
+            }
+        }
+        merged.push(range);
+    }
+
+    let mut filtered = text.to_string();
+    for range in merged.into_iter().rev() {
+        filtered.replace_range(range.clone(), "");
+        clean_removed_boundary(&mut filtered, range.start);
+    }
+    filtered
+}
+
+/// Filters transcription output by removing filler sounds.
 ///
 /// This function cleans up raw transcription text by:
-/// 1. Removing filler words based on the app language (or custom list)
-/// 2. Collapsing repeated word stutters (e.g., "wh wh wh" -> "wh")
-/// 3. Cleaning up excess whitespace
+/// 1. Removing unambiguous repeated or elongated filler sounds across languages
+/// 2. Removing standalone filler tokens that are safe for the selected language
+/// 3. Cleaning up only whitespace and punctuation made redundant by removal
 ///
 /// # Arguments
 /// * `text` - The raw transcription text to filter
-/// * `lang` - The app language code (e.g., "en", "pt-BR") used to select filler words
+/// * `lang` - The transcription language code (e.g., "en", "pt-BR") used to select fillers
 /// * `custom_filler_words` - Optional user-provided filler word list. `Some(vec)` overrides
-///   language defaults; `Some(empty vec)` disables filtering; `None` uses language defaults.
+///   language defaults; `None` uses language defaults.
 ///
 /// # Returns
-/// The filtered text with filler words and stutters removed
+/// The filtered text with filler sounds removed and ordinary words preserved
 pub fn filter_transcription_output(
     text: &str,
     lang: &str,
     custom_filler_words: &Option<Vec<String>>,
 ) -> String {
-    let mut filtered = text.to_string();
+    let mut removal_ranges = Vec::new();
+    collect_removal_matches(
+        &mut removal_ranges,
+        text,
+        &REPEATED_FILLER_SOUND_PATTERN,
+        true,
+    );
+    collect_removal_matches(
+        &mut removal_ranges,
+        text,
+        &ELONGATED_FILLER_SOUND_PATTERN,
+        true,
+    );
 
     // Build filler patterns from custom list or language defaults
-    let patterns: Vec<Regex> = match custom_filler_words {
-        Some(words) => words
-            .iter()
-            .filter_map(|word| Regex::new(&format!(r"(?i)\b{}\b[,.]?", regex::escape(word))).ok())
-            .collect(),
-        None => get_filler_words_for_language(lang)
-            .iter()
-            .map(|word| Regex::new(&format!(r"(?i)\b{}\b[,.]?", regex::escape(word))).unwrap())
-            .collect(),
+    let (patterns, preserve_uppercase_acronyms): (Vec<Regex>, bool) = match custom_filler_words {
+        Some(words) => (
+            words
+                .iter()
+                .filter_map(|word| {
+                    let word = word.trim();
+                    (!word.is_empty())
+                        .then(|| Regex::new(&format!(r"(?iu)\b{}\b", regex::escape(word))).ok())
+                        .flatten()
+                })
+                .collect(),
+            false,
+        ),
+        None => (
+            get_filler_words_for_language(lang)
+                .iter()
+                .map(|word| Regex::new(&format!(r"(?iu)\b{}\b", regex::escape(word))).unwrap())
+                .collect(),
+            true,
+        ),
     };
 
-    // Remove filler words
+    // User-provided fillers are explicit, but built-in heuristics must not
+    // consume all-uppercase abbreviations such as ER, ERR, or AAA.
     for pattern in &patterns {
-        filtered = pattern.replace_all(&filtered, "").to_string();
+        collect_removal_matches(
+            &mut removal_ranges,
+            text,
+            pattern,
+            preserve_uppercase_acronyms,
+        );
     }
 
-    // Collapse repeated 1-2 letter words (stutter artifacts like "wh wh wh wh")
-    filtered = collapse_stutters(&filtered);
-
-    // Clean up multiple spaces to single space
-    filtered = MULTI_SPACE_PATTERN.replace_all(&filtered, " ").to_string();
+    let mut filtered = remove_ranges_with_boundary_cleanup(text, removal_ranges);
+    filtered = MULTI_HORIZONTAL_SPACE_PATTERN
+        .replace_all(&filtered, " ")
+        .to_string();
 
     // Trim leading/trailing whitespace
     filtered.trim().to_string()
@@ -457,7 +594,7 @@ mod tests {
     fn test_filter_filler_words_with_punctuation() {
         let text = "Well, uhm, I think, uh. that's right";
         let result = filter_transcription_output(text, "en", &None);
-        assert_eq!(result, "Well, I think, that's right");
+        assert_eq!(result, "Well, I think. that's right");
     }
 
     #[test]
@@ -489,38 +626,73 @@ mod tests {
     }
 
     #[test]
-    fn test_filter_stutter_collapse() {
-        let text = "w wh wh wh wh wh wh wh wh wh why";
+    fn test_filter_removes_repeated_filler_sounds() {
+        let text = "Well uh uh uh I think um-um-um this works";
         let result = filter_transcription_output(text, "en", &None);
-        assert_eq!(result, "w wh why");
+        assert_eq!(result, "Well I think this works");
     }
 
     #[test]
-    fn test_filter_stutter_short_words() {
-        let text = "I I I I think so so so so";
-        let result = filter_transcription_output(text, "en", &None);
-        assert_eq!(result, "I think so");
+    fn test_filter_removes_russian_repeated_filler_sounds() {
+        let text = "Это а-а-а пример э э э текста и-и-и всё";
+        let result = filter_transcription_output(text, "auto", &None);
+        assert_eq!(result, "Это пример текста всё");
     }
 
     #[test]
-    fn test_filter_stutter_longer_words() {
-        let text = "Check data doc doc doc doc documentation.";
-        let result = filter_transcription_output(text, "en", &None);
-        assert_eq!(result, "Check data doc documentation.");
+    fn test_filter_removes_elongated_filler_sounds() {
+        let text = "So uhhh this is эээ useful";
+        let result = filter_transcription_output(text, "auto", &None);
+        assert_eq!(result, "So this is useful");
     }
 
     #[test]
-    fn test_filter_stutter_mixed_case() {
-        let text = "No NO no NO no";
+    fn test_filter_preserves_meaningful_repetition() {
+        let text = "I I I really mean very very very important";
         let result = filter_transcription_output(text, "en", &None);
-        assert_eq!(result, "No");
+        assert_eq!(result, text);
     }
 
     #[test]
-    fn test_filter_stutter_preserves_two_repetitions() {
-        let text = "no no is fine";
+    fn test_filter_preserves_russian_conjunctions() {
+        let text = "А я и ты";
+        let result = filter_transcription_output(text, "ru", &None);
+        assert_eq!(result, text);
+    }
+
+    #[test]
+    fn test_filter_preserves_mixed_russian_tokens() {
+        let text = "а и а";
+        let result = filter_transcription_output(text, "ru", &None);
+        assert_eq!(result, text);
+    }
+
+    #[test]
+    fn test_filter_preserves_uppercase_er_abbreviation() {
+        let text = "er I went to the ER";
         let result = filter_transcription_output(text, "en", &None);
-        assert_eq!(result, "no no is fine");
+        assert_eq!(result, "I went to the ER");
+    }
+
+    #[test]
+    fn test_filter_preserves_uppercase_acronyms() {
+        let text = "AAA battery reported ERR";
+        let result = filter_transcription_output(text, "en", &None);
+        assert_eq!(result, text);
+    }
+
+    #[test]
+    fn test_filter_does_not_repair_unrelated_punctuation() {
+        let text = ":root uses std::io";
+        let result = filter_transcription_output(text, "en", &None);
+        assert_eq!(result, text);
+    }
+
+    #[test]
+    fn test_filter_repairs_only_the_removed_filler_boundary() {
+        let text = "um, std::io handles ERR";
+        let result = filter_transcription_output(text, "en", &None);
+        assert_eq!(result, "std::io handles ERR");
     }
 
     #[test]

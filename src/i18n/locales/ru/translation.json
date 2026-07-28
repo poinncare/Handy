@@ -364,6 +364,10 @@
         "remove": "Удалить {{word}}",
         "duplicate": "\"{{word}}\" уже существует"
       },
+      "removeFillerSounds": {
+        "label": "Удалять звуки-паразиты",
+        "description": "Удалять из транскрипции повторяющиеся звуки вроде «а-а-а», «э-э-э» и «и-и-и»."
+      },
       "voiceActivityDetection": {
         "title": "Voice Activity Detection",
         "description": "Filter silence from recordings. Streaming-capable models use a longer VAD tail; disabling VAD records raw audio."

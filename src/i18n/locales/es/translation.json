@@ -364,6 +364,10 @@
         "remove": "Eliminar {{word}}",
         "duplicate": "\"{{word}}\" ya existe"
       },
+      "removeFillerSounds": {
+        "label": "Remove filler sounds",
+        "description": "Remove sounds such as repeated ah, uh, um, and er from transcriptions."
+      },
       "voiceActivityDetection": {
         "title": "Detección de actividad de voz",
         "description": "Filtra el silencio de las grabaciones. Los modelos compatibles con streaming usan una cola de VAD más larga; desactivar el VAD graba audio sin procesar."

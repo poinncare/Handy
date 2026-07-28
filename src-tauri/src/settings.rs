@@ -431,6 +431,8 @@ pub struct AppSettings {
     pub lowercase_first_letter: bool,
     #[serde(default = "default_remove_trailing_period")]
     pub remove_trailing_period: bool,
+    #[serde(default = "default_remove_filler_sounds")]
+    pub remove_filler_sounds: bool,
     #[serde(default = "default_app_language")]
     pub app_language: String,
     #[serde(default = "default_theme")]
@@ -541,6 +543,10 @@ fn default_lowercase_first_letter() -> bool {
 
 fn default_remove_trailing_period() -> bool {
     false
+}
+
+fn default_remove_filler_sounds() -> bool {
+    true
 }
 
 fn default_debug_mode() -> bool {
@@ -891,6 +897,7 @@ pub fn get_default_settings() -> AppSettings {
         append_trailing_space: false,
         lowercase_first_letter: default_lowercase_first_letter(),
         remove_trailing_period: default_remove_trailing_period(),
+        remove_filler_sounds: default_remove_filler_sounds(),
         app_language: default_app_language(),
         theme: default_theme(),
         experimental_enabled: false,
@@ -1236,6 +1243,7 @@ mod tests {
             "post_process_selected_prompt_id": null,
             "mute_while_recording": false,
             "append_trailing_space": false,
+            "remove_filler_sounds": true,
             "app_language": "en",
             "experimental_enabled": false,
             "lazy_stream_close": false,
@@ -1367,10 +1375,24 @@ mod tests {
         let settings = get_default_settings();
         assert!(!settings.auto_submit);
         assert_eq!(settings.auto_submit_key, AutoSubmitKey::Enter);
+        assert!(settings.remove_filler_sounds);
         assert_eq!(
             settings.settings_schema_version,
             CURRENT_SETTINGS_SCHEMA_VERSION
         );
+    }
+
+    #[test]
+    fn stored_settings_without_filler_sound_option_default_to_enabled() {
+        let mut stored = default_settings_json();
+        stored
+            .as_object_mut()
+            .unwrap()
+            .remove("remove_filler_sounds");
+
+        let settings: AppSettings = serde_json::from_value(stored).unwrap();
+
+        assert!(settings.remove_filler_sounds);
     }
 
     #[cfg(not(target_os = "linux"))]

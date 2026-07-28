@@ -364,6 +364,10 @@
         "remove": "Supprimer {{word}}",
         "duplicate": "\"{{word}}\" existe déjà"
       },
+      "removeFillerSounds": {
+        "label": "Remove filler sounds",
+        "description": "Remove sounds such as repeated ah, uh, um, and er from transcriptions."
+      },
       "voiceActivityDetection": {
         "title": "Détection d'activité vocale (VAD)",
         "description": "Filtre le silence des enregistrements. Les modèles compatibles avec le streaming utilisent une marge de détection VAD plus longue ; désactiver le VAD enregistre l'audio brut."

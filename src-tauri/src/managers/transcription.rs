@@ -1621,11 +1621,15 @@ fn post_process_transcription_text(
             raw
         };
 
-        filter_transcription_output(
-            &corrected,
-            &settings.app_language,
-            &settings.custom_filler_words,
-        )
+        if settings.remove_filler_sounds {
+            filter_transcription_output(
+                &corrected,
+                &settings.selected_language,
+                &settings.custom_filler_words,
+            )
+        } else {
+            corrected
+        }
     })
 }
 
@@ -2019,6 +2023,29 @@ mod tests {
         let result = fail_open_text_transform(raw.clone(), |_| {
             panic!("simulated optional cleanup failure")
         });
+
+        assert_eq!(result, raw);
+    }
+
+    #[test]
+    fn post_processing_removes_filler_sounds_by_default() {
+        let mut settings = crate::settings::get_default_settings();
+        settings.selected_language = "en".to_string();
+
+        let result =
+            post_process_transcription_text("Um, this is uhhh ready".to_string(), &settings, false);
+
+        assert_eq!(result, "this is ready");
+    }
+
+    #[test]
+    fn post_processing_preserves_raw_fillers_when_setting_is_disabled() {
+        let mut settings = crate::settings::get_default_settings();
+        settings.selected_language = "en".to_string();
+        settings.remove_filler_sounds = false;
+
+        let raw = "Um, this is uhhh ready".to_string();
+        let result = post_process_transcription_text(raw.clone(), &settings, false);
 
         assert_eq!(result, raw);
     }

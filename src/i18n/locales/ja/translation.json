@@ -364,6 +364,10 @@
         "remove": "{{word}}を削除",
         "duplicate": "「{{word}}」は既に存在します"
       },
+      "removeFillerSounds": {
+        "label": "Remove filler sounds",
+        "description": "Remove sounds such as repeated ah, uh, um, and er from transcriptions."
+      },
       "voiceActivityDetection": {
         "title": "音声区間検出 (VAD)",
         "description": "録音から無音部分を除去します。ストリーミング対応モデルはより長い音声検出区間を使用します。VAD を無効にすると音声をそのまま録音します。"

@@ -364,6 +364,10 @@
         "remove": "{{word}} 제거",
         "duplicate": "\"{{word}}\"이(가) 이미 존재합니다"
       },
+      "removeFillerSounds": {
+        "label": "Remove filler sounds",
+        "description": "Remove sounds such as repeated ah, uh, um, and er from transcriptions."
+      },
       "voiceActivityDetection": {
         "title": "Voice Activity Detection",
         "description": "Filter silence from recordings. Streaming-capable models use a longer VAD tail; disabling VAD records raw audio."

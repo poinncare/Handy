@@ -147,6 +147,8 @@ const settingUpdaters: {
     commands.changeLowercaseFirstLetterSetting(value as boolean),
   remove_trailing_period: (value) =>
     commands.changeRemoveTrailingPeriodSetting(value as boolean),
+  remove_filler_sounds: (value) =>
+    commands.changeRemoveFillerSoundsSetting(value as boolean),
   log_level: (value) => commands.setLogLevel(value as any),
   app_language: (value) => commands.changeAppLanguageSetting(value as string),
   theme: (value) => commands.changeThemeSetting(value as string),
