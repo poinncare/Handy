@@ -245,7 +245,8 @@
         "output": "Výstup",
         "transcription": "Přepis",
         "history": "Historie",
-        "experimental": "Experimentální"
+        "experimental": "Experimentální",
+        "memoryTraining": "Návyk hlasového zadávání"
       },
       "experimentalToggle": {
         "label": "Experimentální funkce",
@@ -371,6 +372,17 @@
       "voiceActivityDetection": {
         "title": "Voice Activity Detection",
         "description": "Filter silence from recordings. Streaming-capable models use a longer VAD tail; disabling VAD records raw audio."
+      },
+      "memoryTraining": {
+        "enabled": {
+          "label": "Připomínky hlasového zadávání",
+          "description": "Vytvořte si návyk mluvit místo psaní. Handy vám po delším psaní jemně připomene hlasové zadávání."
+        },
+        "threshold": {
+          "label": "Doba psaní",
+          "description": "Jak dlouho můžete psát bez přerušení, než Handy navrhne hlasové zadávání.",
+          "seconds": "{{count}} s"
+        }
       }
     },
     "postProcessing": {
@@ -641,7 +653,8 @@
   },
   "overlay": {
     "transcribing": "Přepisuji...",
-    "processing": "Zpracovávám..."
+    "processing": "Zpracovávám...",
+    "memoryTip": "Použijte hlasové zadávání."
   },
   "whatsNew": {
     "title": "Novinky v Handy v{{version}}"

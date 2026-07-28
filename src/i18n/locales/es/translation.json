@@ -245,7 +245,8 @@
         "output": "Salida",
         "transcription": "Transcripción",
         "history": "Historial",
-        "experimental": "Experimental"
+        "experimental": "Experimental",
+        "memoryTraining": "Hábito de entrada por voz"
       },
       "experimentalToggle": {
         "label": "Funciones experimentales",
@@ -371,6 +372,17 @@
       "voiceActivityDetection": {
         "title": "Detección de actividad de voz",
         "description": "Filtra el silencio de las grabaciones. Los modelos compatibles con streaming usan una cola de VAD más larga; desactivar el VAD graba audio sin procesar."
+      },
+      "memoryTraining": {
+        "enabled": {
+          "label": "Recordatorios de entrada por voz",
+          "description": "Crea el hábito de hablar en vez de escribir. Handy te lo recordará discretamente cuando lleves un rato escribiendo."
+        },
+        "threshold": {
+          "label": "Tiempo de escritura",
+          "description": "Cuánto tiempo puedes escribir sin parar antes de que Handy sugiera la entrada por voz.",
+          "seconds": "{{count}} s"
+        }
       }
     },
     "postProcessing": {
@@ -641,7 +653,8 @@
   },
   "overlay": {
     "transcribing": "Transcribiendo...",
-    "processing": "Procesando..."
+    "processing": "Procesando...",
+    "memoryTip": "Usa la entrada por voz."
   },
   "whatsNew": {
     "title": "Nuevo en Handy v{{version}}"

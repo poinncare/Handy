@@ -173,6 +173,7 @@ pub fn initialize_shortcuts(app: AppHandle) -> Result<(), String> {
     // Check if already initialized
     if app.try_state::<ShortcutsInitialized>().is_some() {
         log::debug!("Shortcuts already initialized");
+        crate::typing_monitor::initialize_after_shortcuts(&app);
         return Ok(());
     }
 
@@ -181,6 +182,10 @@ pub fn initialize_shortcuts(app: AppHandle) -> Result<(), String> {
 
     // Mark as initialized
     app.manage(ShortcutsInitialized);
+
+    // Global typing detection needs the same macOS Accessibility permission as
+    // shortcuts, so it is deliberately initialized only after this point.
+    crate::typing_monitor::initialize_after_shortcuts(&app);
 
     log::info!("Shortcuts initialized successfully");
     Ok(())

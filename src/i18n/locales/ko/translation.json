@@ -245,7 +245,8 @@
         "output": "출력",
         "transcription": "전사",
         "history": "히스토리",
-        "experimental": "실험적"
+        "experimental": "실험적",
+        "memoryTraining": "음성 입력 습관"
       },
       "experimentalToggle": {
         "label": "실험적 기능",
@@ -371,6 +372,17 @@
       "voiceActivityDetection": {
         "title": "Voice Activity Detection",
         "description": "Filter silence from recordings. Streaming-capable models use a longer VAD tail; disabling VAD records raw audio."
+      },
+      "memoryTraining": {
+        "enabled": {
+          "label": "음성 입력 알림",
+          "description": "타이핑 대신 말하는 습관을 만들어 보세요. 한동안 계속 입력하면 Handy가 부드럽게 알려 드립니다."
+        },
+        "threshold": {
+          "label": "타이핑 시간",
+          "description": "Handy가 음성 입력을 제안하기 전까지 연속으로 입력할 수 있는 시간입니다.",
+          "seconds": "{{count}}초"
+        }
       }
     },
     "postProcessing": {
@@ -641,7 +653,8 @@
   },
   "overlay": {
     "transcribing": "텍스트로 변환 중...",
-    "processing": "처리 중..."
+    "processing": "처리 중...",
+    "memoryTip": "음성 입력을 사용하세요."
   },
   "whatsNew": {
     "title": "Handy v{{version}}의 새 소식"

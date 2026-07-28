@@ -245,7 +245,8 @@
         "output": "Sortie",
         "transcription": "Transcription",
         "history": "Historique",
-        "experimental": "Expérimental"
+        "experimental": "Expérimental",
+        "memoryTraining": "Habitude de saisie vocale"
       },
       "experimentalToggle": {
         "label": "Fonctionnalités Expérimentales",
@@ -371,6 +372,17 @@
       "voiceActivityDetection": {
         "title": "Détection d'activité vocale (VAD)",
         "description": "Filtre le silence des enregistrements. Les modèles compatibles avec le streaming utilisent une marge de détection VAD plus longue ; désactiver le VAD enregistre l'audio brut."
+      },
+      "memoryTraining": {
+        "enabled": {
+          "label": "Rappels de saisie vocale",
+          "description": "Prenez l’habitude de parler au lieu de taper. Handy vous le rappellera discrètement après un certain temps de saisie."
+        },
+        "threshold": {
+          "label": "Durée de saisie",
+          "description": "Durée de saisie continue avant que Handy ne suggère la saisie vocale.",
+          "seconds": "{{count}} s"
+        }
       }
     },
     "postProcessing": {
@@ -641,7 +653,8 @@
   },
   "overlay": {
     "transcribing": "Transcription...",
-    "processing": "Traitement..."
+    "processing": "Traitement...",
+    "memoryTip": "Utilisez la saisie vocale."
   },
   "whatsNew": {
     "title": "Nouveautés de Handy v{{version}}"

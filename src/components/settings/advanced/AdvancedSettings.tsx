@@ -22,6 +22,7 @@ import { KeyboardImplementationSelector } from "../debug/KeyboardImplementationS
 import { VoiceActivityDetection } from "../VoiceActivityDetection";
 import { AccelerationSelector } from "../AccelerationSelector";
 import { LazyStreamClose } from "../LazyStreamClose";
+import { MemoryTraining } from "../MemoryTraining";
 
 export const AdvancedSettings: React.FC = () => {
   const { t } = useTranslation();
@@ -59,6 +60,10 @@ export const AdvancedSettings: React.FC = () => {
           descriptionMode="tooltip"
           grouped={true}
         />
+      </SettingsGroup>
+
+      <SettingsGroup title={t("settings.advanced.groups.memoryTraining")}>
+        <MemoryTraining descriptionMode="tooltip" grouped />
       </SettingsGroup>
 
       {experimentalEnabled && (

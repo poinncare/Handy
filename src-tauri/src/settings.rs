@@ -470,6 +470,12 @@ pub struct AppSettings {
     /// `overlay_position` (position `none` → style `None`).
     #[serde(default = "default_overlay_style")]
     pub overlay_style: OverlayStyle,
+    /// Opt-in global manual-typing detection used by the memory-training hint.
+    #[serde(default)]
+    pub memory_training_enabled: bool,
+    /// Continuous manual typing required before the memory-training hint appears.
+    #[serde(default = "default_memory_training_threshold_secs")]
+    pub memory_training_threshold_secs: u64,
 }
 
 fn default_model() -> String {
@@ -535,6 +541,20 @@ fn default_overlay_style() -> OverlayStyle {
 
 fn default_vad_enabled() -> bool {
     true
+}
+
+pub const MIN_MEMORY_TRAINING_THRESHOLD_SECS: u64 = 1;
+pub const MAX_MEMORY_TRAINING_THRESHOLD_SECS: u64 = 60;
+
+pub fn clamp_memory_training_threshold(value: u64) -> u64 {
+    value.clamp(
+        MIN_MEMORY_TRAINING_THRESHOLD_SECS,
+        MAX_MEMORY_TRAINING_THRESHOLD_SECS,
+    )
+}
+
+fn default_memory_training_threshold_secs() -> u64 {
+    5
 }
 
 fn default_lowercase_first_letter() -> bool {
@@ -915,6 +935,8 @@ pub fn get_default_settings() -> AppSettings {
         extra_recording_buffer_ms: 0,
         vad_enabled: default_vad_enabled(),
         overlay_style: default_overlay_style(),
+        memory_training_enabled: false,
+        memory_training_threshold_secs: default_memory_training_threshold_secs(),
     }
 }
 
@@ -974,6 +996,13 @@ pub fn get_settings(app: &AppHandle) -> AppSettings {
             };
 
         if apply_settings_migrations(&mut settings, &settings_value) {
+            updated = true;
+        }
+
+        let clamped_threshold =
+            clamp_memory_training_threshold(settings.memory_training_threshold_secs);
+        if settings.memory_training_threshold_secs != clamped_threshold {
+            settings.memory_training_threshold_secs = clamped_threshold;
             updated = true;
         }
 
@@ -1104,7 +1133,9 @@ fn apply_settings_migrations(
     updated
 }
 
-pub fn write_settings(app: &AppHandle, settings: AppSettings) {
+pub fn write_settings(app: &AppHandle, mut settings: AppSettings) {
+    settings.memory_training_threshold_secs =
+        clamp_memory_training_threshold(settings.memory_training_threshold_secs);
     let store = app
         .store(crate::portable::store_path(SETTINGS_STORE_PATH))
         .expect("Failed to initialize store");
@@ -1380,6 +1411,32 @@ mod tests {
             settings.settings_schema_version,
             CURRENT_SETTINGS_SCHEMA_VERSION
         );
+    }
+
+    #[test]
+    fn memory_training_is_opt_in_with_five_second_default() {
+        let settings = get_default_settings();
+        assert!(!settings.memory_training_enabled);
+        assert_eq!(settings.memory_training_threshold_secs, 5);
+    }
+
+    #[test]
+    fn memory_training_threshold_is_clamped_to_sensible_bounds() {
+        assert_eq!(clamp_memory_training_threshold(0), 1);
+        assert_eq!(clamp_memory_training_threshold(5), 5);
+        assert_eq!(clamp_memory_training_threshold(600), 60);
+    }
+
+    #[test]
+    fn old_stores_receive_memory_training_defaults() {
+        let mut stored = default_settings_json();
+        let object = stored.as_object_mut().unwrap();
+        object.remove("memory_training_enabled");
+        object.remove("memory_training_threshold_secs");
+
+        let settings: AppSettings = serde_json::from_value(stored).unwrap();
+        assert!(!settings.memory_training_enabled);
+        assert_eq!(settings.memory_training_threshold_secs, 5);
     }
 
     #[test]

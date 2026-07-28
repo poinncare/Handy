@@ -245,7 +245,8 @@
         "output": "आउटपुट",
         "transcription": "ट्रांसक्रिप्शन",
         "history": "इतिहास",
-        "experimental": "प्रायोगिक"
+        "experimental": "प्रायोगिक",
+        "memoryTraining": "वॉइस इनपुट की आदत"
       },
       "experimentalToggle": {
         "label": "प्रायोगिक सुविधाएं",
@@ -371,6 +372,17 @@
       "voiceActivityDetection": {
         "title": "वॉइस एक्टिविटी डिटेक्शन",
         "description": "रिकॉर्डिंग से बिना आवाज़ वाले हिस्से हटाएं. स्ट्रीमिंग वाले मॉडल लंबी VAD टेल इस्तेमाल करते हैं; VAD बंद करने पर कच्चा ऑडियो रिकॉर्ड होता है."
+      },
+      "memoryTraining": {
+        "enabled": {
+          "label": "वॉइस इनपुट रिमाइंडर",
+          "description": "टाइप करने के बजाय बोलने की आदत बनाएँ। कुछ देर तक टाइप करने पर Handy आपको हल्के से याद दिलाएगा।"
+        },
+        "threshold": {
+          "label": "टाइपिंग अवधि",
+          "description": "Handy के वॉइस इनपुट सुझाने से पहले लगातार टाइप करने की अवधि।",
+          "seconds": "{{count}} सेकंड"
+        }
       }
     },
     "postProcessing": {
@@ -636,6 +648,7 @@
   },
   "overlay": {
     "transcribing": "ट्रांसक्राइब हो रहा है...",
-    "processing": "प्रोसेस हो रहा है..."
+    "processing": "प्रोसेस हो रहा है...",
+    "memoryTip": "वॉइस इनपुट का उपयोग करें।"
   }
 }

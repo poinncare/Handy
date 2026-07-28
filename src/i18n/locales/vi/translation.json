@@ -245,7 +245,8 @@
         "output": "Đầu ra",
         "transcription": "Chuyển đổi",
         "history": "Lịch sử",
-        "experimental": "Thử nghiệm"
+        "experimental": "Thử nghiệm",
+        "memoryTraining": "Thói quen nhập liệu bằng giọng nói"
       },
       "experimentalToggle": {
         "label": "Tính năng thử nghiệm",
@@ -371,6 +372,17 @@
       "voiceActivityDetection": {
         "title": "Voice Activity Detection",
         "description": "Filter silence from recordings. Streaming-capable models use a longer VAD tail; disabling VAD records raw audio."
+      },
+      "memoryTraining": {
+        "enabled": {
+          "label": "Lời nhắc nhập liệu bằng giọng nói",
+          "description": "Tạo thói quen nói thay vì gõ. Handy sẽ nhẹ nhàng nhắc bạn khi bạn đã gõ được một lúc."
+        },
+        "threshold": {
+          "label": "Thời gian gõ",
+          "description": "Khoảng thời gian gõ liên tục trước khi Handy đề xuất nhập liệu bằng giọng nói.",
+          "seconds": "{{count}} giây"
+        }
       }
     },
     "postProcessing": {
@@ -641,7 +653,8 @@
   },
   "overlay": {
     "transcribing": "Đang chuyển đổi...",
-    "processing": "Đang xử lý..."
+    "processing": "Đang xử lý...",
+    "memoryTip": "Hãy dùng nhập liệu bằng giọng nói."
   },
   "whatsNew": {
     "title": "Điểm mới trong Handy v{{version}}"

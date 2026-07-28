@@ -245,7 +245,19 @@
         "output": "Output",
         "transcription": "Transcription",
         "history": "History",
+        "memoryTraining": "Voice Input Habit",
         "experimental": "Experimental"
+      },
+      "memoryTraining": {
+        "enabled": {
+          "label": "Voice Input Reminders",
+          "description": "Build the habit of speaking instead of typing. Handy will gently remind you when you have been typing for a while."
+        },
+        "threshold": {
+          "label": "Typing Duration",
+          "description": "How long you can type continuously before Handy suggests voice input.",
+          "seconds": "{{count}} sec"
+        }
       },
       "experimentalToggle": {
         "label": "Experimental Features",
@@ -644,6 +656,7 @@
   },
   "overlay": {
     "transcribing": "Transcribing...",
-    "processing": "Processing..."
+    "processing": "Processing...",
+    "memoryTip": "Use voice input"
   }
 }

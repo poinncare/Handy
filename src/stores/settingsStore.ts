@@ -149,6 +149,22 @@ const settingUpdaters: {
     commands.changeRemoveTrailingPeriodSetting(value as boolean),
   remove_filler_sounds: (value) =>
     commands.changeRemoveFillerSoundsSetting(value as boolean),
+  memory_training_enabled: async (value) => {
+    const result = await commands.changeMemoryTrainingEnabledSetting(
+      value as boolean,
+    );
+    if (result.status === "error") {
+      throw new Error(result.error);
+    }
+  },
+  memory_training_threshold_secs: async (value) => {
+    const result = await commands.changeMemoryTrainingThresholdSetting(
+      value as number,
+    );
+    if (result.status === "error") {
+      throw new Error(result.error);
+    }
+  },
   log_level: (value) => commands.setLogLevel(value as any),
   app_language: (value) => commands.changeAppLanguageSetting(value as string),
   theme: (value) => commands.changeThemeSetting(value as string),

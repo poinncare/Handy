@@ -105,11 +105,14 @@ tauri-plugin-updater = "2.10.0"
 # is inherited here, so Parakeet/Moonshine/etc. still run on CPU.
 windows = { version = "0.61.3", features = [
   "Win32_Media_Audio_Endpoints",
+  "Win32_System_Com",
   "Win32_System_Com_StructuredStorage",
   "Win32_System_LibraryLoader",
+  "Win32_System_Ole",
   "Win32_System_Threading",
   "Win32_System_Variant",
   "Win32_Foundation",
+  "Win32_UI_Accessibility",
   "Win32_UI_WindowsAndMessaging",
 ] }
 winreg = "0.55"
@@ -144,6 +147,11 @@ tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel", branch = "v2.
 transcribe-cpp = { version = "0.1.3", default-features = false, features = ["metal"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
+atspi = { version = "0.30.0", default-features = false, features = [
+  "connection",
+  "proxies",
+  "tokio",
+] }
 gtk-layer-shell = { version = "0.8", features = ["v0_6"] }
 gtk = "0.18"
 wl-clipboard-rs = "0.9.3"

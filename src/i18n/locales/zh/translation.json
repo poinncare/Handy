@@ -245,7 +245,8 @@
         "output": "输出",
         "transcription": "转录",
         "history": "历史",
-        "experimental": "实验性"
+        "experimental": "实验性",
+        "memoryTraining": "语音输入习惯"
       },
       "experimentalToggle": {
         "label": "实验性功能",
@@ -371,6 +372,17 @@
       "voiceActivityDetection": {
         "title": "Voice Activity Detection",
         "description": "Filter silence from recordings. Streaming-capable models use a longer VAD tail; disabling VAD records raw audio."
+      },
+      "memoryTraining": {
+        "enabled": {
+          "label": "语音输入提醒",
+          "description": "养成用说话代替打字的习惯。持续打字一段时间后，Handy 会轻柔地提醒你。"
+        },
+        "threshold": {
+          "label": "打字时长",
+          "description": "持续打字多久后，Handy 会建议使用语音输入。",
+          "seconds": "{{count}} 秒"
+        }
       }
     },
     "postProcessing": {
@@ -641,7 +653,8 @@
   },
   "overlay": {
     "transcribing": "正在转录...",
-    "processing": "处理中..."
+    "processing": "处理中...",
+    "memoryTip": "请使用语音输入。"
   },
   "whatsNew": {
     "title": "Handy v{{version}} 新功能"

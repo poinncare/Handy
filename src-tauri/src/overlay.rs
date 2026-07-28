@@ -33,6 +33,42 @@ tauri_panel! {
     })
 }
 
+#[cfg(target_os = "macos")]
+mod memory_tip_panel {
+    use tauri::Manager;
+    use tauri_nspanel::tauri_panel;
+
+    tauri_panel! {
+        panel!(MemoryTipPanel {
+            config: {
+                can_become_key_window: false,
+                is_floating_panel: true
+            }
+        })
+    }
+}
+
+#[cfg(target_os = "macos")]
+use memory_tip_panel::MemoryTipPanel;
+
+#[cfg(target_os = "macos")]
+mod memory_focus_panel {
+    use tauri::Manager;
+    use tauri_nspanel::tauri_panel;
+
+    tauri_panel! {
+        panel!(MemoryFocusPanel {
+            config: {
+                can_become_key_window: false,
+                is_floating_panel: true
+            }
+        })
+    }
+}
+
+#[cfg(target_os = "macos")]
+use memory_focus_panel::MemoryFocusPanel;
+
 // Native overlay window sizes (logical points). One window is reused for every
 // state and resized in `show_overlay_state`; each size need only be at least as
 // large as the card it hosts. The classic indicator fills its compact window;
@@ -48,6 +84,12 @@ const OVERLAY_HEIGHT: f64 = 36.0;
 const OVERLAY_STREAM_WIDTH: f64 = 400.0;
 const OVERLAY_STREAM_HEIGHT: f64 = 120.0;
 
+const MEMORY_TIP_WIDTH: f64 = 280.0;
+const MEMORY_TIP_HEIGHT: f64 = 44.0;
+// Keep in sync with .memory-highlight-stage padding. The transparent margin
+// gives the CSS shadow room while the halo border lands on the input bounds.
+const MEMORY_FOCUS_PADDING: f64 = 32.0;
+
 /// Overlay window size (logical) for a given UI state.
 fn overlay_dimensions(state: &str) -> (f64, f64) {
     if state == "streaming" {
@@ -58,6 +100,10 @@ fn overlay_dimensions(state: &str) -> (f64, f64) {
 }
 
 static LAST_MIC_LEVEL_EMIT: AtomicU64 = AtomicU64::new(0);
+// Native window hiding is delayed long enough for the webview's fade-out to
+// finish. A generation prevents an older delayed hide from closing a newly
+// shown tip when the user resumes typing quickly.
+static MEMORY_TIP_VISIBILITY_GENERATION: AtomicU64 = AtomicU64::new(0);
 const EMIT_THROTTLE_MS: u64 = 33; // ~30 FPS
 
 #[cfg(target_os = "macos")]
@@ -267,6 +313,42 @@ fn calculate_overlay_position(
     Some((x, y))
 }
 
+fn padded_focus_bounds(
+    bounds: crate::focused_input::ScreenRect,
+    padding: f64,
+) -> crate::focused_input::ScreenRect {
+    crate::focused_input::ScreenRect {
+        x: bounds.x - padding,
+        y: bounds.y - padding,
+        width: bounds.width + padding * 2.0,
+        height: bounds.height + padding * 2.0,
+    }
+}
+
+#[cfg(any(target_os = "windows", target_os = "linux"))]
+fn physical_focus_padding(app_handle: &AppHandle, bounds: crate::focused_input::ScreenRect) -> f64 {
+    let center_x = bounds.x + bounds.width / 2.0;
+    let center_y = bounds.y + bounds.height / 2.0;
+    let scale = app_handle
+        .available_monitors()
+        .ok()
+        .and_then(|monitors| {
+            monitors.into_iter().find_map(|monitor| {
+                let position = monitor.position();
+                let size = monitor.size();
+                let right = f64::from(position.x) + f64::from(size.width);
+                let bottom = f64::from(position.y) + f64::from(size.height);
+                (center_x >= f64::from(position.x)
+                    && center_x < right
+                    && center_y >= f64::from(position.y)
+                    && center_y < bottom)
+                    .then_some(monitor.scale_factor())
+            })
+        })
+        .unwrap_or(1.0);
+    MEMORY_FOCUS_PADDING * scale
+}
+
 /// Current overlay window size in logical units (points), for repositioning
 /// without assuming a fixed size (compact vs. streaming).
 #[cfg(not(target_os = "windows"))]
@@ -354,6 +436,36 @@ fn place_windows_overlay(
         monitor.scale_factor()
     );
     Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn place_windows_memory_focus(
+    window: &tauri::webview::WebviewWindow,
+    bounds: crate::focused_input::ScreenRect,
+) -> Result<(), String> {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE, SWP_SHOWWINDOW,
+    };
+
+    let hwnd = window
+        .hwnd()
+        .map_err(|error| format!("failed to get memory focus window handle: {error}"))?;
+    let x = bounds.x.round() as i32;
+    let y = bounds.y.round() as i32;
+    let width = bounds.width.round().max(1.0) as i32;
+    let height = bounds.height.round().max(1.0) as i32;
+    unsafe {
+        SetWindowPos(
+            hwnd,
+            Some(HWND_TOPMOST),
+            x,
+            y,
+            width,
+            height,
+            SWP_NOACTIVATE | SWP_SHOWWINDOW,
+        )
+        .map_err(|error| format!("failed to position memory focus overlay: {error}"))
+    }
 }
 
 /// Creates the recording overlay window and keeps it hidden by default
@@ -453,6 +565,149 @@ pub fn create_recording_overlay(app_handle: &AppHandle) {
                 log::error!("Failed to create recording overlay panel: {}", e);
             }
         }
+    }
+}
+
+/// Creates independent memory-training overlays. They must not share the
+/// recording overlay window because recording hides are intentionally delayed.
+#[cfg(not(target_os = "macos"))]
+pub fn create_memory_training_overlays(app_handle: &AppHandle) {
+    let mut tip_builder = WebviewWindowBuilder::new(
+        app_handle,
+        "memory_tip_overlay",
+        tauri::WebviewUrl::App("src/overlay/index.html".into()),
+    )
+    .title("Memory training")
+    .resizable(false)
+    .inner_size(MEMORY_TIP_WIDTH, MEMORY_TIP_HEIGHT)
+    .shadow(false)
+    .maximizable(false)
+    .minimizable(false)
+    .closable(false)
+    .decorations(false)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .transparent(true)
+    .focusable(false)
+    .focused(false)
+    .visible(false);
+
+    if let Some(data_dir) = crate::portable::data_dir() {
+        tip_builder = tip_builder.data_directory(data_dir.join("webview"));
+    }
+
+    match tip_builder.build() {
+        Ok(window) => {
+            let _ = window.set_ignore_cursor_events(true);
+            #[cfg(target_os = "linux")]
+            if init_gtk_layer_shell(&window) {
+                debug!("GTK layer shell initialized for memory tip overlay");
+            }
+        }
+        Err(error) => log::error!("Failed to create memory tip overlay: {error}"),
+    }
+
+    let mut focus_builder = WebviewWindowBuilder::new(
+        app_handle,
+        "memory_focus_overlay",
+        tauri::WebviewUrl::App("src/memory-highlight/index.html".into()),
+    )
+    .title("Memory focus")
+    .resizable(false)
+    .inner_size(1.0, 1.0)
+    .shadow(false)
+    .maximizable(false)
+    .minimizable(false)
+    .closable(false)
+    .decorations(false)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .transparent(true)
+    .focusable(false)
+    .focused(false)
+    .visible(false);
+
+    if let Some(data_dir) = crate::portable::data_dir() {
+        focus_builder = focus_builder.data_directory(data_dir.join("webview"));
+    }
+
+    match focus_builder.build() {
+        Ok(window) => {
+            let _ = window.set_ignore_cursor_events(true);
+        }
+        Err(error) => log::error!("Failed to create memory focus overlay: {error}"),
+    }
+}
+
+#[cfg(target_os = "macos")]
+pub fn create_memory_training_overlays(app_handle: &AppHandle) {
+    if let Some((x, y)) =
+        calculate_overlay_position(app_handle, MEMORY_TIP_WIDTH, MEMORY_TIP_HEIGHT)
+    {
+        match PanelBuilder::<_, MemoryTipPanel>::new(app_handle, "memory_tip_overlay")
+            .url(WebviewUrl::App("src/overlay/index.html".into()))
+            .title("Memory training")
+            .position(tauri::Position::Logical(tauri::LogicalPosition { x, y }))
+            .level(PanelLevel::Status)
+            .size(tauri::Size::Logical(tauri::LogicalSize {
+                width: MEMORY_TIP_WIDTH,
+                height: MEMORY_TIP_HEIGHT,
+            }))
+            .has_shadow(false)
+            .transparent(true)
+            .no_activate(true)
+            .corner_radius(0.0)
+            .style_mask(StyleMask::empty().borderless().nonactivating_panel())
+            .with_window(|window| window.decorations(false).transparent(true).focusable(false))
+            .collection_behavior(
+                CollectionBehavior::new()
+                    .can_join_all_spaces()
+                    .full_screen_auxiliary(),
+            )
+            .build()
+        {
+            Ok(panel) => {
+                panel.hide();
+                if let Some(window) = app_handle.get_webview_window("memory_tip_overlay") {
+                    let _ = window.set_ignore_cursor_events(true);
+                }
+            }
+            Err(error) => log::error!("Failed to create memory tip panel: {error}"),
+        }
+    }
+
+    match PanelBuilder::<_, MemoryFocusPanel>::new(app_handle, "memory_focus_overlay")
+        .url(WebviewUrl::App("src/memory-highlight/index.html".into()))
+        .title("Memory focus")
+        .position(tauri::Position::Logical(tauri::LogicalPosition {
+            x: 0.0,
+            y: 0.0,
+        }))
+        .level(PanelLevel::Status)
+        .size(tauri::Size::Logical(tauri::LogicalSize {
+            width: 1.0,
+            height: 1.0,
+        }))
+        .has_shadow(false)
+        .transparent(true)
+        .no_activate(true)
+        .corner_radius(0.0)
+        .style_mask(StyleMask::empty().borderless().nonactivating_panel())
+        .with_window(|window| window.decorations(false).transparent(true).focusable(false))
+        .collection_behavior(
+            CollectionBehavior::new()
+                .can_join_all_spaces()
+                .full_screen_auxiliary(),
+        )
+        .build()
+    {
+        Ok(panel) => {
+            panel.hide();
+            if let Some(window) = app_handle.get_webview_window("memory_focus_overlay") {
+                let _ = window.set_ignore_cursor_events(true);
+            }
+        }
+        Err(error) => log::error!("Failed to create memory focus panel: {error}"),
     }
 }
 
@@ -596,6 +851,141 @@ pub fn hide_recording_overlay(app_handle: &AppHandle) {
     }
 }
 
+pub fn show_memory_tip_overlay(app_handle: &AppHandle) {
+    MEMORY_TIP_VISIBILITY_GENERATION.fetch_add(1, Ordering::Relaxed);
+    let Some(window) = app_handle.get_webview_window("memory_tip_overlay") else {
+        return;
+    };
+
+    #[cfg(target_os = "linux")]
+    update_gtk_layer_shell_anchors(&window);
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize {
+            width: MEMORY_TIP_WIDTH,
+            height: MEMORY_TIP_HEIGHT,
+        }));
+        if let Some((x, y)) =
+            calculate_overlay_position(app_handle, MEMORY_TIP_WIDTH, MEMORY_TIP_HEIGHT)
+        {
+            let _ = window.set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y }));
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    if let Err(error) =
+        place_windows_overlay(app_handle, &window, MEMORY_TIP_WIDTH, MEMORY_TIP_HEIGHT)
+    {
+        log::error!("Failed to place memory tip overlay: {error}");
+    }
+
+    let _ = window.show();
+    #[cfg(target_os = "windows")]
+    force_overlay_topmost(&window);
+    let _ = app_handle.emit_to("memory_tip_overlay", "show-overlay", "memory-tip");
+}
+
+pub fn show_memory_focus_overlay(
+    app_handle: &AppHandle,
+    focused_bounds: crate::focused_input::ScreenRect,
+) {
+    #[cfg(target_os = "linux")]
+    if crate::utils::is_wayland() {
+        // Wayland intentionally does not expose arbitrary global coordinates.
+        // The edge-anchored memory tip remains available.
+        hide_memory_focus_overlay(app_handle);
+        return;
+    }
+
+    let Some(window) = app_handle.get_webview_window("memory_focus_overlay") else {
+        return;
+    };
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
+    let padding = physical_focus_padding(app_handle, focused_bounds);
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+    let padding = MEMORY_FOCUS_PADDING;
+    let bounds = padded_focus_bounds(focused_bounds, padding);
+    if !bounds.is_usable() {
+        return;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        if let Err(error) = place_windows_memory_focus(&window, bounds) {
+            log::error!("Failed to place memory focus overlay: {error}");
+            return;
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize {
+            width: bounds.width,
+            height: bounds.height,
+        }));
+        let _ = window.set_position(tauri::Position::Logical(tauri::LogicalPosition {
+            x: bounds.x,
+            y: bounds.y,
+        }));
+    }
+
+    #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+    {
+        let width = bounds.width.round().max(1.0) as u32;
+        let height = bounds.height.round().max(1.0) as u32;
+        let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(
+            width, height,
+        )));
+        let _ = window.set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(
+            bounds.x.round() as i32,
+            bounds.y.round() as i32,
+        )));
+    }
+
+    let _ = window.show();
+    #[cfg(target_os = "windows")]
+    force_overlay_topmost(&window);
+}
+
+pub fn hide_memory_tip_overlay(app_handle: &AppHandle) {
+    let generation = MEMORY_TIP_VISIBILITY_GENERATION
+        .fetch_add(1, Ordering::Relaxed)
+        .wrapping_add(1);
+    if let Some(window) = app_handle.get_webview_window("memory_tip_overlay") {
+        let _ = app_handle.emit_to("memory_tip_overlay", "hide-overlay", ());
+        drop(window);
+
+        let delayed_app = app_handle.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(320));
+            if MEMORY_TIP_VISIBILITY_GENERATION.load(Ordering::Relaxed) != generation {
+                return;
+            }
+
+            let main_thread_app = delayed_app.clone();
+            let _ = delayed_app.run_on_main_thread(move || {
+                if MEMORY_TIP_VISIBILITY_GENERATION.load(Ordering::Relaxed) == generation {
+                    if let Some(window) = main_thread_app.get_webview_window("memory_tip_overlay") {
+                        let _ = window.hide();
+                    }
+                }
+            });
+        });
+    }
+}
+
+pub fn hide_memory_focus_overlay(app_handle: &AppHandle) {
+    if let Some(window) = app_handle.get_webview_window("memory_focus_overlay") {
+        let _ = window.hide();
+    }
+}
+
+pub fn hide_memory_training_overlays(app_handle: &AppHandle) {
+    hide_memory_tip_overlay(app_handle);
+    hide_memory_focus_overlay(app_handle);
+}
+
 // Cached "overlay is enabled" flag, kept in sync with overlay_style. Avoids
 // reading the Tauri store on every audio callback (~24 Hz during recording).
 // Defaults to false so the audio path doesn't emit until lib.rs::setup
@@ -661,6 +1051,45 @@ mod tests {
         assert!(is_mouse_within_monitor((-1, 1239), &position, &size));
         assert!(!is_mouse_within_monitor((0, 0), &position, &size));
         assert!(!is_mouse_within_monitor((-1, 1240), &position, &size));
+    }
+
+    #[test]
+    fn memory_focus_padding_expands_equally_on_every_edge() {
+        let padded = padded_focus_bounds(
+            crate::focused_input::ScreenRect {
+                x: 100.0,
+                y: 200.0,
+                width: 320.0,
+                height: 40.0,
+            },
+            7.0,
+        );
+        assert_eq!(
+            padded,
+            crate::focused_input::ScreenRect {
+                x: 93.0,
+                y: 193.0,
+                width: 334.0,
+                height: 54.0,
+            }
+        );
+    }
+
+    #[test]
+    fn memory_focus_padding_preserves_negative_screen_coordinates() {
+        let padded = padded_focus_bounds(
+            crate::focused_input::ScreenRect {
+                x: -800.0,
+                y: -50.0,
+                width: 200.0,
+                height: 30.0,
+            },
+            5.0,
+        );
+        assert_eq!(padded.x, -805.0);
+        assert_eq!(padded.y, -55.0);
+        assert_eq!(padded.width, 210.0);
+        assert_eq!(padded.height, 40.0);
     }
 
     #[cfg(target_os = "windows")]

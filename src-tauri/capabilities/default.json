@@ -2,7 +2,12 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Capabilities for the app",
-  "windows": ["main", "recording_overlay"],
+  "windows": [
+    "main",
+    "recording_overlay",
+    "memory_tip_overlay",
+    "memory_focus_overlay"
+  ],
   "permissions": [
     "core:default",
     "opener:default",

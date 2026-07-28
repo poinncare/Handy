@@ -1550,6 +1550,9 @@ fn should_write_post_paste_clipboard(
 }
 
 pub fn paste(text: String, app_handle: AppHandle) -> Result<(), String> {
+    // Ignore every synthesized chord/keystroke in this operation, including
+    // direct typing and auto-submit, while preserving manual global input.
+    let _typing_suppression = crate::typing_monitor::suspend_injected_input(&app_handle);
     let settings = get_settings(&app_handle);
     let paste_method = settings.paste_method;
     let paste_delay_ms = settings.paste_delay_ms;

@@ -245,7 +245,8 @@
         "output": "Вивід",
         "transcription": "Транскрипція",
         "history": "Історія",
-        "experimental": "Експериментальне"
+        "experimental": "Експериментальне",
+        "memoryTraining": "Звичка голосового введення"
       },
       "experimentalToggle": {
         "label": "Експериментальні функції",
@@ -371,6 +372,17 @@
       "voiceActivityDetection": {
         "title": "Voice Activity Detection",
         "description": "Filter silence from recordings. Streaming-capable models use a longer VAD tail; disabling VAD records raw audio."
+      },
+      "memoryTraining": {
+        "enabled": {
+          "label": "Нагадування про голосове введення",
+          "description": "Виробляйте звичку говорити замість друкувати. Handy ненав’язливо нагадає про голосове введення, якщо ви довго друкуєте."
+        },
+        "threshold": {
+          "label": "Тривалість друку",
+          "description": "Скільки часу можна друкувати безперервно, перш ніж Handy запропонує голосове введення.",
+          "seconds": "{{count}} с"
+        }
       }
     },
     "postProcessing": {
@@ -641,7 +653,8 @@
   },
   "overlay": {
     "transcribing": "Обробка...",
-    "processing": "Постобробка..."
+    "processing": "Постобробка...",
+    "memoryTip": "Скористайтеся голосовим введенням."
   },
   "whatsNew": {
     "title": "Нове в Handy v{{version}}"

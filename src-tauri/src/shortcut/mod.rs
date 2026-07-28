@@ -498,6 +498,32 @@ pub fn change_audio_feedback_volume_setting(app: AppHandle, volume: f32) -> Resu
 
 #[tauri::command]
 #[specta::specta]
+pub fn change_memory_training_enabled_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    // Probe/start before persistence so an unavailable global listener (most
+    // commonly Linux evdev permissions) cannot leave a broken enabled setting.
+    crate::typing_monitor::set_enabled(&app, enabled)?;
+    let mut settings = settings::get_settings(&app);
+    settings.memory_training_enabled = enabled;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn change_memory_training_threshold_setting(
+    app: AppHandle,
+    threshold_secs: u64,
+) -> Result<(), String> {
+    let seconds = settings::clamp_memory_training_threshold(threshold_secs);
+    let mut app_settings = settings::get_settings(&app);
+    app_settings.memory_training_threshold_secs = seconds;
+    settings::write_settings(&app, app_settings);
+    crate::typing_monitor::set_threshold(&app, seconds);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
 pub fn change_sound_theme_setting(app: AppHandle, theme: String) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
     let parsed = match theme.as_str() {

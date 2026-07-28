@@ -245,7 +245,8 @@
         "output": "Utmatning",
         "transcription": "Transkription",
         "history": "Historik",
-        "experimental": "Experimentellt"
+        "experimental": "Experimentellt",
+        "memoryTraining": "Vana för röstinmatning"
       },
       "experimentalToggle": {
         "label": "Experimentella funktioner",
@@ -371,6 +372,17 @@
       "voiceActivityDetection": {
         "title": "Voice Activity Detection",
         "description": "Filter silence from recordings. Streaming-capable models use a longer VAD tail; disabling VAD records raw audio."
+      },
+      "memoryTraining": {
+        "enabled": {
+          "label": "Påminnelser om röstinmatning",
+          "description": "Gör det till en vana att tala i stället för att skriva. Handy påminner dig diskret när du har skrivit en stund."
+        },
+        "threshold": {
+          "label": "Skrivtid",
+          "description": "Hur länge du kan skriva utan avbrott innan Handy föreslår röstinmatning.",
+          "seconds": "{{count}} sek."
+        }
       }
     },
     "postProcessing": {
@@ -641,7 +653,8 @@
   },
   "overlay": {
     "transcribing": "Transkriberar...",
-    "processing": "Bearbetar..."
+    "processing": "Bearbetar...",
+    "memoryTip": "Använd röstinmatning."
   },
   "whatsNew": {
     "title": "Nytt i Handy v{{version}}"

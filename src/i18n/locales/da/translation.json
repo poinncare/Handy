@@ -245,7 +245,8 @@
         "output": "Output",
         "transcription": "Transskription",
         "history": "Historik",
-        "experimental": "Eksperimentel"
+        "experimental": "Eksperimentel",
+        "memoryTraining": "Vane med stemmeinput"
       },
       "experimentalToggle": {
         "label": "Eksperimentelle funktioner",
@@ -371,6 +372,17 @@
       "voiceActivityDetection": {
         "title": "Stemmeaktivitetsdetektion",
         "description": "Filtrer stilhed fra optagelser. Streaming-modeller bruger en længere VAD-hale; deaktivering af VAD optager rå lyd."
+      },
+      "memoryTraining": {
+        "enabled": {
+          "label": "Påmindelser om stemmeinput",
+          "description": "Gør det til en vane at tale i stedet for at skrive. Handy minder dig diskret om det, når du har skrevet et stykke tid."
+        },
+        "threshold": {
+          "label": "Skrivetid",
+          "description": "Hvor længe du kan skrive uden pause, før Handy foreslår stemmeinput.",
+          "seconds": "{{count}} sek."
+        }
       }
     },
     "postProcessing": {
@@ -636,6 +648,7 @@
   },
   "overlay": {
     "transcribing": "Transskriberer...",
-    "processing": "Behandler..."
+    "processing": "Behandler...",
+    "memoryTip": "Brug stemmeinput."
   }
 }

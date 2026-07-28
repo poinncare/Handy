@@ -245,7 +245,8 @@
         "output": "出力",
         "transcription": "文字起こし",
         "history": "履歴",
-        "experimental": "実験的"
+        "experimental": "実験的",
+        "memoryTraining": "音声入力の習慣"
       },
       "experimentalToggle": {
         "label": "実験的な機能",
@@ -371,6 +372,17 @@
       "voiceActivityDetection": {
         "title": "音声区間検出 (VAD)",
         "description": "録音から無音部分を除去します。ストリーミング対応モデルはより長い音声検出区間を使用します。VAD を無効にすると音声をそのまま録音します。"
+      },
+      "memoryTraining": {
+        "enabled": {
+          "label": "音声入力のリマインダー",
+          "description": "文字入力の代わりに話す習慣を身につけましょう。しばらく入力を続けると、Handy がさりげなくお知らせします。"
+        },
+        "threshold": {
+          "label": "入力時間",
+          "description": "Handy が音声入力を提案するまで連続して入力できる時間です。",
+          "seconds": "{{count}}秒"
+        }
       }
     },
     "postProcessing": {
@@ -641,7 +653,8 @@
   },
   "overlay": {
     "transcribing": "文字起こし中…",
-    "processing": "処理中…"
+    "processing": "処理中…",
+    "memoryTip": "音声入力を使いましょう。"
   },
   "whatsNew": {
     "title": "Handy v{{version}} の新機能"

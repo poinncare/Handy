@@ -245,7 +245,8 @@
         "output": "Wyjście",
         "transcription": "Transkrypcja",
         "history": "Historia",
-        "experimental": "Eksperymentalne"
+        "experimental": "Eksperymentalne",
+        "memoryTraining": "Nawyk wprowadzania głosowego"
       },
       "experimentalToggle": {
         "label": "Funkcje Eksperymentalne",
@@ -371,6 +372,17 @@
       "voiceActivityDetection": {
         "title": "Voice Activity Detection",
         "description": "Filter silence from recordings. Streaming-capable models use a longer VAD tail; disabling VAD records raw audio."
+      },
+      "memoryTraining": {
+        "enabled": {
+          "label": "Przypomnienia o wprowadzaniu głosowym",
+          "description": "Wyrób sobie nawyk mówienia zamiast pisania. Handy dyskretnie przypomni o tym po dłuższym pisaniu."
+        },
+        "threshold": {
+          "label": "Czas pisania",
+          "description": "Jak długo możesz pisać bez przerwy, zanim Handy zasugeruje wprowadzanie głosowe.",
+          "seconds": "{{count}} s"
+        }
       }
     },
     "postProcessing": {
@@ -641,7 +653,8 @@
   },
   "overlay": {
     "transcribing": "Transkrypcja...",
-    "processing": "Przetwarzanie..."
+    "processing": "Przetwarzanie...",
+    "memoryTip": "Użyj wprowadzania głosowego."
   },
   "whatsNew": {
     "title": "Nowości w Handy v{{version}}"

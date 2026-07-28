@@ -1,4 +1,4 @@
-import { listen } from "@tauri-apps/api/event";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -17,7 +17,12 @@ import type {
 import i18n, { syncLanguageFromSettings } from "@/i18n";
 import { getLanguageDirection } from "@/lib/utils/rtl";
 
-type OverlayState = "recording" | "streaming" | "transcribing" | "processing";
+type OverlayState =
+  | "recording"
+  | "streaming"
+  | "transcribing"
+  | "processing"
+  | "memory-tip";
 
 // Number of reactive bars in the waveform (the simple, smoothed style shared by
 // every overlay form). Mic levels arrive as 16 FFT buckets; we take the first N.
@@ -54,8 +59,26 @@ const RecordingOverlay: React.FC = () => {
   const direction = getLanguageDirection(i18n.language);
 
   useEffect(() => {
-    const setupEventListeners = async () => {
-      const unlistenShow = await listen("show-overlay", async (event) => {
+    let disposed = false;
+    const unlistenFunctions: UnlistenFn[] = [];
+
+    const registerListener = async (
+      listener: Promise<UnlistenFn>,
+    ): Promise<void> => {
+      try {
+        const unlisten = await listener;
+        if (disposed) {
+          unlisten();
+        } else {
+          unlistenFunctions.push(unlisten);
+        }
+      } catch (error) {
+        console.error("Failed to register overlay event listener:", error);
+      }
+    };
+
+    void registerListener(
+      listen("show-overlay", async (event) => {
         await syncLanguageFromSettings();
         // The Live panel flows downward from a top overlay and upward from a
         // bottom one; read the placement so the layout can flip to match.
@@ -69,6 +92,8 @@ const RecordingOverlay: React.FC = () => {
         } catch {
           // Keep the previous/default placement if settings can't be read.
         }
+        if (disposed) return;
+
         const overlayState = event.payload as OverlayState;
         setState(overlayState);
         if (overlayState === "recording" || overlayState === "streaming") {
@@ -81,13 +106,17 @@ const RecordingOverlay: React.FC = () => {
           setSession((s) => s + 1); // remount the card fresh for this session
         }
         setIsVisible(true);
-      });
+      }),
+    );
 
-      const unlistenHide = await listen("hide-overlay", () => {
+    void registerListener(
+      listen("hide-overlay", () => {
         setIsVisible(false);
-      });
+      }),
+    );
 
-      const unlistenLevel = await listen<number[]>("mic-level", (event) => {
+    void registerListener(
+      listen<number[]>("mic-level", (event) => {
         const newLevels = event.payload as number[];
         // Exponential smoothing across the 16 buckets, then take the first N
         // bars for the shared waveform.
@@ -97,28 +126,27 @@ const RecordingOverlay: React.FC = () => {
         });
         smoothedLevelsRef.current = smoothed;
         setLevels(smoothed.slice(0, WAVE_BARS));
-      });
+      }),
+    );
 
-      const unlistenStream = await events.streamTextEvent.listen((event) => {
+    void registerListener(
+      events.streamTextEvent.listen((event) => {
         setStreamText(event.payload);
-      });
+      }),
+    );
 
-      const unlistenPhase = await events.streamPhaseEvent.listen((event) => {
+    void registerListener(
+      events.streamPhaseEvent.listen((event) => {
         const payload: StreamPhaseEvent = event.payload;
         setPhase(payload.phase);
         if (payload.kind) setWorkKind(payload.kind);
-      });
+      }),
+    );
 
-      return () => {
-        unlistenShow();
-        unlistenHide();
-        unlistenLevel();
-        unlistenStream();
-        unlistenPhase();
-      };
+    return () => {
+      disposed = true;
+      unlistenFunctions.splice(0).forEach((unlisten) => unlisten());
     };
-
-    setupEventListeners();
   }, []);
 
   // Elapsed timer while the Live overlay is visible.
@@ -211,6 +239,23 @@ const RecordingOverlay: React.FC = () => {
       <div className="sbase-r">{showCancel && cancelBtn}</div>
     </div>
   );
+
+  if (state === "memory-tip") {
+    return (
+      <div dir={direction} className="memory-tip-stage">
+        <div
+          className={`memory-tip-overlay ${isVisible ? "fade-in" : ""}`}
+          role="status"
+          aria-live="polite"
+        >
+          <span className="memory-tip-icon" aria-hidden="true">
+            <MicrophoneIcon width={19} height={19} />
+          </span>
+          <span className="memory-tip-text">{t("overlay.memoryTip")}</span>
+        </div>
+      </div>
+    );
+  }
 
   // ---- Live overlay: a pill that sculpts open into a panel ----
   if (state === "streaming") {

@@ -245,7 +245,8 @@
         "output": "פלט",
         "transcription": "תמלול",
         "history": "היסטוריה",
-        "experimental": "ניסיוני"
+        "experimental": "ניסיוני",
+        "memoryTraining": "הרגל הקלדה קולית"
       },
       "experimentalToggle": {
         "label": "תכונות ניסיוניות",
@@ -371,6 +372,17 @@
       "voiceActivityDetection": {
         "title": "Voice Activity Detection",
         "description": "Filter silence from recordings. Streaming-capable models use a longer VAD tail; disabling VAD records raw audio."
+      },
+      "memoryTraining": {
+        "enabled": {
+          "label": "תזכורות להקלדה קולית",
+          "description": "פתחו הרגל לדבר במקום להקליד. Handy יזכיר לכם בעדינות לאחר הקלדה ממושכת."
+        },
+        "threshold": {
+          "label": "משך ההקלדה",
+          "description": "משך ההקלדה הרצופה לפני ש-Handy יציע הקלדה קולית.",
+          "seconds": "{{count}} שנ׳"
+        }
       }
     },
     "postProcessing": {
@@ -641,7 +653,8 @@
   },
   "overlay": {
     "transcribing": "מתמלל...",
-    "processing": "מעבד..."
+    "processing": "מעבד...",
+    "memoryTip": "השתמשו בהקלדה קולית."
   },
   "whatsNew": {
     "title": "חדש ב-Handy v{{version}}"

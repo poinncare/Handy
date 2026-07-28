@@ -314,6 +314,71 @@
   transform: scale(0.95);
 }
 
+/* ============================================================
+   Voice-input reminder — a compact, non-interactive Handy pill.
+   ============================================================ */
+.memory-tip-stage {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--s-font);
+  pointer-events: none;
+}
+
+.memory-tip-overlay {
+  min-height: 36px;
+  max-width: calc(100% - 8px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-block: 6px;
+  padding-inline: 9px 14px;
+  box-sizing: border-box;
+  color: #ffffff;
+  background: #000000e6;
+  border: 1px solid #ffffff14;
+  border-radius: 999px;
+  box-shadow: 0 8px 24px #0000002e;
+  opacity: 0;
+  transform: translateY(3px) scale(0.98);
+  transition:
+    opacity 220ms ease-out,
+    transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.memory-tip-overlay.fade-in {
+  opacity: 1;
+  transform: none;
+}
+
+.memory-tip-icon {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: 50%;
+  background: #faa2ca1f;
+}
+
+.memory-tip-icon svg {
+  display: block;
+}
+
+.memory-tip-text {
+  min-width: 0;
+  overflow: hidden;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.005em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* working state (transcribing / polishing) — spinner + label */
 .sspinner {
   width: 13px;

@@ -224,7 +224,8 @@
         "output": "الإخراج",
         "transcription": "التفريغ الصوتي",
         "history": "السجل",
-        "experimental": "تجريبي"
+        "experimental": "تجريبي",
+        "memoryTraining": "عادة الإدخال الصوتي"
       },
       "experimentalToggle": {
         "label": "الميزات التجريبية",
@@ -350,6 +351,17 @@
       "voiceActivityDetection": {
         "title": "Voice Activity Detection",
         "description": "Filter silence from recordings. Streaming-capable models use a longer VAD tail; disabling VAD records raw audio."
+      },
+      "memoryTraining": {
+        "enabled": {
+          "label": "تذكيرات الإدخال الصوتي",
+          "description": "كوّن عادة التحدث بدلاً من الكتابة. سيذكّرك Handy بلطف عندما تكتب لفترة طويلة."
+        },
+        "threshold": {
+          "label": "مدة الكتابة",
+          "description": "مدة الكتابة المتواصلة قبل أن يقترح Handy الإدخال الصوتي.",
+          "seconds": "{{count}} ث"
+        }
       }
     },
     "postProcessing": {
@@ -641,7 +653,8 @@
   },
   "overlay": {
     "transcribing": "...جاري التفريغ",
-    "processing": "...جاري المعالجة"
+    "processing": "...جاري المعالجة",
+    "memoryTip": "استخدم الإدخال الصوتي."
   },
   "whatsNew": {
     "title": "الجديد في Handy v{{version}}"

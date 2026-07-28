@@ -245,7 +245,8 @@
         "output": "Ausgabe",
         "transcription": "Transkription",
         "history": "Verlauf",
-        "experimental": "Experimentell"
+        "experimental": "Experimentell",
+        "memoryTraining": "Gewohnheit zur Spracheingabe"
       },
       "experimentalToggle": {
         "label": "Experimentelle Funktionen",
@@ -371,6 +372,17 @@
       "voiceActivityDetection": {
         "title": "Sprachaktivitätserkennung (VAD)",
         "description": "Filtert Stille aus Aufnahmen. Streamingfähige Modelle verwenden ein längeres VAD-Ende; das Deaktivieren von VAD nimmt Rohaudio auf."
+      },
+      "memoryTraining": {
+        "enabled": {
+          "label": "Erinnerungen an Spracheingabe",
+          "description": "Machen Sie es sich zur Gewohnheit, statt zu tippen zu sprechen. Handy erinnert Sie nach längerem Tippen dezent daran."
+        },
+        "threshold": {
+          "label": "Tippdauer",
+          "description": "Wie lange Sie ohne Unterbrechung tippen können, bevor Handy Spracheingabe vorschlägt.",
+          "seconds": "{{count}} Sek."
+        }
       }
     },
     "postProcessing": {
@@ -641,7 +653,8 @@
   },
   "overlay": {
     "transcribing": "Transkribiere...",
-    "processing": "Verarbeite..."
+    "processing": "Verarbeite...",
+    "memoryTip": "Spracheingabe verwenden."
   },
   "whatsNew": {
     "title": "Neu in Handy v{{version}}"

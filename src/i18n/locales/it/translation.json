@@ -245,7 +245,8 @@
         "output": "Output",
         "transcription": "Trascrizione",
         "history": "Cronologia",
-        "experimental": "Sperimentale"
+        "experimental": "Sperimentale",
+        "memoryTraining": "Abitudine all'input vocale"
       },
       "experimentalToggle": {
         "label": "Funzionalità Sperimentali",
@@ -371,6 +372,17 @@
       "voiceActivityDetection": {
         "title": "Rilevamento dell'attività vocale",
         "description": "Filtra il silenzio dalle registrazioni. I modelli che supportano lo streaming utilizzano una coda VAD più lunga; disabilitando la VAD si registra l'audio grezzo."
+      },
+      "memoryTraining": {
+        "enabled": {
+          "label": "Promemoria per l'input vocale",
+          "description": "Prendi l’abitudine di parlare invece di digitare. Handy te lo ricorderà con discrezione dopo che avrai digitato per un po’."
+        },
+        "threshold": {
+          "label": "Durata della digitazione",
+          "description": "Per quanto tempo puoi digitare senza interruzioni prima che Handy suggerisca l’input vocale.",
+          "seconds": "{{count}} s"
+        }
       }
     },
     "postProcessing": {
@@ -641,7 +653,8 @@
   },
   "overlay": {
     "transcribing": "Trascrizione...",
-    "processing": "Elaborazione..."
+    "processing": "Elaborazione...",
+    "memoryTip": "Usa l'input vocale."
   },
   "whatsNew": {
     "title": "Novità in Handy v{{version}}"

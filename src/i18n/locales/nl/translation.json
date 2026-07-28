@@ -245,7 +245,8 @@
         "output": "Uitvoer",
         "transcription": "Transcriptie",
         "history": "Geschiedenis",
-        "experimental": "Experimenteel"
+        "experimental": "Experimenteel",
+        "memoryTraining": "Gewoonte voor spraakinvoer"
       },
       "experimentalToggle": {
         "label": "Experimentele functies",
@@ -371,6 +372,17 @@
       "voiceActivityDetection": {
         "title": "Spraakactiviteitsdetectie (VAD)",
         "description": "Filter stilte uit opnames. Streaming-modellen gebruiken een langere VAD-uitloop; het uitschakelen van VAD neemt de ruwe audio op."
+      },
+      "memoryTraining": {
+        "enabled": {
+          "label": "Herinneringen voor spraakinvoer",
+          "description": "Maak er een gewoonte van om te spreken in plaats van te typen. Handy herinnert je er subtiel aan als je een tijdje hebt getypt."
+        },
+        "threshold": {
+          "label": "Typduur",
+          "description": "Hoe lang je onafgebroken kunt typen voordat Handy spraakinvoer voorstelt.",
+          "seconds": "{{count}} sec."
+        }
       }
     },
     "postProcessing": {
@@ -644,6 +656,7 @@
   },
   "overlay": {
     "transcribing": "Transcriberen...",
-    "processing": "Verwerken..."
+    "processing": "Verwerken...",
+    "memoryTip": "Gebruik spraakinvoer."
   }
 }

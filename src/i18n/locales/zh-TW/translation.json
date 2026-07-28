@@ -245,7 +245,8 @@
         "output": "輸出",
         "transcription": "轉錄",
         "history": "歷史",
-        "experimental": "實驗性"
+        "experimental": "實驗性",
+        "memoryTraining": "語音輸入習慣"
       },
       "experimentalToggle": {
         "label": "實驗性功能",
@@ -371,6 +372,17 @@
       "voiceActivityDetection": {
         "title": "語音活動偵測",
         "description": "過濾錄音中的靜音。支援串流的模型會使用較長的 VAD 尾段；停用 VAD 則會錄製原始音訊"
+      },
+      "memoryTraining": {
+        "enabled": {
+          "label": "語音輸入提醒",
+          "description": "養成以說話取代打字的習慣。持續打字一段時間後，Handy 會溫和地提醒您。"
+        },
+        "threshold": {
+          "label": "打字時間",
+          "description": "持續打字多久後，Handy 會建議使用語音輸入。",
+          "seconds": "{{count}} 秒"
+        }
       }
     },
     "postProcessing": {
@@ -641,7 +653,8 @@
   },
   "overlay": {
     "transcribing": "正在轉錄...",
-    "processing": "處理中..."
+    "processing": "處理中...",
+    "memoryTip": "請使用語音輸入。"
   },
   "whatsNew": {
     "title": "Handy v{{version}} 新功能"

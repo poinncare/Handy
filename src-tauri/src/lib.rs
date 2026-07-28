@@ -7,6 +7,7 @@ mod catalog;
 pub mod cli;
 mod clipboard;
 mod commands;
+mod focused_input;
 mod helpers;
 mod input;
 mod llm_client;
@@ -19,6 +20,7 @@ mod signal_handle;
 mod transcription_coordinator;
 mod tray;
 mod tray_i18n;
+mod typing_monitor;
 mod utils;
 
 pub use cli::CliArgs;
@@ -181,6 +183,7 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     app_handle.manage(transcription_manager.clone());
     app_handle.manage(history_manager.clone());
     app_handle.manage(tray::CurrentTrayIconState::new());
+    typing_monitor::register(app_handle);
 
     // Note: Shortcuts are NOT initialized here.
     // The frontend is responsible for calling the `initialize_shortcuts` command
@@ -339,6 +342,7 @@ fn initialize_core_logic(app_handle: &AppHandle) {
 
     // Create the recording overlay window (hidden by default)
     utils::create_recording_overlay(app_handle);
+    utils::create_memory_training_overlays(app_handle);
 }
 
 #[tauri::command]
@@ -606,6 +610,8 @@ pub fn run(cli_args: CliArgs) {
             shortcut::change_ptt_setting,
             shortcut::change_audio_feedback_setting,
             shortcut::change_audio_feedback_volume_setting,
+            shortcut::change_memory_training_enabled_setting,
+            shortcut::change_memory_training_threshold_setting,
             shortcut::change_sound_theme_setting,
             shortcut::change_theme_setting,
             shortcut::change_start_hidden_setting,

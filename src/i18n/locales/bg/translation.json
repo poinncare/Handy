@@ -245,7 +245,8 @@
         "output": "Изход",
         "transcription": "Транскрипция",
         "history": "История",
-        "experimental": "Експериментални"
+        "experimental": "Експериментални",
+        "memoryTraining": "Навик за гласово въвеждане"
       },
       "experimentalToggle": {
         "label": "Експериментални функции",
@@ -371,6 +372,17 @@
       "voiceActivityDetection": {
         "title": "Voice Activity Detection",
         "description": "Filter silence from recordings. Streaming-capable models use a longer VAD tail; disabling VAD records raw audio."
+      },
+      "memoryTraining": {
+        "enabled": {
+          "label": "Напомняния за гласово въвеждане",
+          "description": "Изградете навик да говорите, вместо да пишете. Handy ще ви напомни ненатрапчиво, когато пишете по-дълго."
+        },
+        "threshold": {
+          "label": "Продължителност на писането",
+          "description": "Колко дълго можете да пишете без прекъсване, преди Handy да предложи гласово въвеждане.",
+          "seconds": "{{count}} сек"
+        }
       }
     },
     "postProcessing": {
@@ -641,7 +653,8 @@
   },
   "overlay": {
     "transcribing": "Транскрибиране...",
-    "processing": "Обработка..."
+    "processing": "Обработка...",
+    "memoryTip": "Използвайте гласово въвеждане."
   },
   "whatsNew": {
     "title": "Ново в Handy v{{version}}"

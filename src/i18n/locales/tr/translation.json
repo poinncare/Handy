@@ -245,7 +245,8 @@
         "output": "Çıktı",
         "transcription": "Transkripsiyon",
         "history": "Geçmiş",
-        "experimental": "Deneysel"
+        "experimental": "Deneysel",
+        "memoryTraining": "Sesli giriş alışkanlığı"
       },
       "experimentalToggle": {
         "label": "Deneysel Özellikler",
@@ -371,6 +372,17 @@
       "voiceActivityDetection": {
         "title": "Voice Activity Detection",
         "description": "Filter silence from recordings. Streaming-capable models use a longer VAD tail; disabling VAD records raw audio."
+      },
+      "memoryTraining": {
+        "enabled": {
+          "label": "Sesli giriş hatırlatıcıları",
+          "description": "Yazmak yerine konuşmayı alışkanlık hâline getirin. Bir süre yazdığınızda Handy size nazikçe hatırlatır."
+        },
+        "threshold": {
+          "label": "Yazma süresi",
+          "description": "Handy sesli girişi önermeden önce kesintisiz yazabileceğiniz süre.",
+          "seconds": "{{count}} sn"
+        }
       }
     },
     "postProcessing": {
@@ -641,7 +653,8 @@
   },
   "overlay": {
     "transcribing": "Transkribe ediliyor...",
-    "processing": "İşleniyor..."
+    "processing": "İşleniyor...",
+    "memoryTip": "Sesli girişi kullanın."
   },
   "whatsNew": {
     "title": "Handy v{{version}} yenilikleri"
