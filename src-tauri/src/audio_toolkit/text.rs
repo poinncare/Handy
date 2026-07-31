@@ -276,19 +276,19 @@ fn get_filler_words_for_language(lang: &str) -> &'static [&'static str] {
 
     match base_lang {
         "en" => &[
-            "uh", "um", "uhm", "umm", "uhh", "uhhh", "erm", "err", "er", "ah", "ahh", "hmm", "hm",
-            "mmm", "mm", "mh",
+            "uh", "um", "uhm", "erm", "err", "er", "ah", "eh", "hmm", "hm", "mmm", "mm", "mh",
+            "mhm",
         ],
-        "es" => &["ehm", "mmm", "hmm", "hm"],
-        "pt" => &["ahm", "hmm", "mmm", "hm"],
-        "fr" => &["euh", "hmm", "hm", "mmm"],
+        "es" => &["eh", "ehm", "em", "mmm", "hmm", "hm"],
+        "pt" => &["ahm", "ahn", "hmm", "mmm", "hm"],
+        "fr" => &["euh", "heu", "hmm", "hm", "mmm"],
         "de" => &["äh", "ähm", "hmm", "hm", "mmm"],
-        "it" => &["ehm", "hmm", "mmm", "hm"],
-        "cs" => &["ehm", "hmm", "mmm", "hm"],
-        "pl" => &["hmm", "mmm", "hm"],
+        "it" => &["eh", "ehm", "hmm", "mmm", "hm"],
+        "cs" => &["eh", "ehm", "hmm", "mmm", "hm"],
+        "pl" => &["yyy", "eee", "hmm", "mmm", "hm"],
         "tr" => &["hmm", "mmm", "hm"],
-        "ru" => &["эм", "э", "хм", "мм", "ммм", "hmm", "mmm"],
-        "uk" => &["ем", "е", "хм", "мм", "ммм", "hmm", "mmm"],
+        "ru" => &["эм", "э", "хм", "гм", "кхм", "мгм", "мм", "hmm", "mmm"],
+        "uk" => &["ем", "е", "хм", "гм", "кхм", "мгм", "мм", "hmm", "mmm"],
         "ar" => &["hmm", "mmm"],
         "ja" => &["hmm", "mmm"],
         "ko" => &["hmm", "mmm"],
@@ -300,6 +300,155 @@ fn get_filler_words_for_language(lang: &str) -> &'static [&'static str] {
         // separately below and are safe across languages.
         _ => &["uh", "uhm", "uhh", "uhhh", "hmm", "mmm"],
     }
+}
+
+/// Resolve `auto` well enough for safe, language-specific filler removal.
+///
+/// Whisper-family batch transcription supplies its detected language to the
+/// caller. Streaming and some ONNX engines do not, so use the output script as
+/// a fallback. Russian and Ukrainian hesitation sounds share the forms handled
+/// here; choosing `ru` for Cyrillic is therefore sufficient and avoids the old
+/// `auto` behavior that retained every standalone Cyrillic filler.
+fn resolve_filler_language<'a>(lang: &'a str, text: &str) -> &'a str {
+    let base_lang = lang.split(&['-', '_'][..]).next().unwrap_or(lang);
+    if !matches!(base_lang, "" | "auto" | "unknown" | "und") {
+        return base_lang;
+    }
+
+    let has_cyrillic = text
+        .chars()
+        .any(|character| matches!(character as u32, 0x0400..=0x052f));
+    if has_cyrillic {
+        "ru"
+    } else {
+        base_lang
+    }
+}
+
+static FILLER_TOKEN_PATTERN: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?iu)\b\p{L}+(?:[-‐‑‒–—]\p{L}+)*\b").unwrap());
+
+fn canonical_sound_form(text: &str) -> String {
+    let mut canonical = String::new();
+    let mut previous = None;
+
+    for character in text.chars().filter(|character| character.is_alphabetic()) {
+        for lowercase in character.to_lowercase() {
+            if previous != Some(lowercase) {
+                canonical.push(lowercase);
+                previous = Some(lowercase);
+            }
+        }
+    }
+
+    canonical
+}
+
+fn has_hesitation_rendering(text: &str) -> bool {
+    let mut previous = None;
+    let mut repeated_letter = false;
+    let mut has_separator = false;
+
+    for character in text.chars() {
+        if matches!(character, '-' | '‐' | '‑' | '‒' | '–' | '—') {
+            has_separator = true;
+            previous = None;
+            continue;
+        }
+        if !character.is_alphabetic() {
+            continue;
+        }
+
+        let lowercase = character.to_lowercase().next().unwrap_or(character);
+        if previous == Some(lowercase) {
+            repeated_letter = true;
+        }
+        previous = Some(lowercase);
+    }
+
+    repeated_letter || has_separator
+}
+
+fn is_generated_hesitation_variant(text: &str, lang: &str) -> bool {
+    if !has_hesitation_rendering(text) {
+        return false;
+    }
+
+    let canonical = canonical_sound_form(text);
+    let canonical_length = canonical.chars().count();
+    if canonical.is_empty() || canonical_length > 3 {
+        return false;
+    }
+
+    match lang {
+        "ru" | "uk" => {
+            let mut vowel_count = 0;
+            let valid = canonical.chars().all(|character| {
+                if matches!(
+                    character,
+                    'а' | 'э' | 'е' | 'ё' | 'ы' | 'и' | 'о' | 'у' | 'я'
+                ) {
+                    vowel_count += 1;
+                    true
+                } else {
+                    matches!(character, 'м' | 'х' | 'г' | 'к')
+                }
+            });
+            let starts_with_vowel = canonical.chars().next().is_some_and(|character| {
+                matches!(
+                    character,
+                    'а' | 'э' | 'е' | 'ё' | 'ы' | 'и' | 'о' | 'у' | 'я'
+                )
+            });
+            valid
+                && ((starts_with_vowel && vowel_count == 1)
+                    || canonical
+                        .chars()
+                        .all(|character| matches!(character, 'м' | 'х' | 'г')))
+        }
+        _ => {
+            let mut vowel_count = 0;
+            let valid = canonical.chars().all(|character| {
+                if matches!(character, 'a' | 'e' | 'i' | 'o' | 'u' | 'ä' | 'y') {
+                    vowel_count += 1;
+                    true
+                } else {
+                    matches!(character, 'h' | 'm' | 'r' | 'n')
+                }
+            });
+            let starts_with_vowel = canonical.chars().next().is_some_and(|character| {
+                matches!(character, 'a' | 'e' | 'i' | 'o' | 'u' | 'ä' | 'y')
+            });
+            valid
+                && ((starts_with_vowel && vowel_count == 1)
+                    || canonical
+                        .chars()
+                        .all(|character| matches!(character, 'h' | 'm')))
+        }
+    }
+}
+
+fn collect_builtin_filler_matches(ranges: &mut Vec<Range<usize>>, text: &str, lang: &str) {
+    let fillers = get_filler_words_for_language(lang);
+    let canonical_fillers: Vec<String> = fillers
+        .iter()
+        .map(|filler| canonical_sound_form(filler))
+        .collect();
+
+    ranges.extend(FILLER_TOKEN_PATTERN.find_iter(text).filter_map(|matched| {
+        let token = matched.as_str();
+        if is_uppercase_acronym(token) {
+            return None;
+        }
+
+        let canonical = canonical_sound_form(token);
+        let lowercase = token.to_lowercase();
+        let is_exact_filler = fillers.iter().any(|filler| lowercase == *filler);
+        let is_rendered_filler =
+            has_hesitation_rendering(token) && canonical_fillers.contains(&canonical);
+        (is_exact_filler || is_rendered_filler || is_generated_hesitation_variant(token, lang))
+            .then(|| matched.range())
+    }));
 }
 
 static REPEATED_FILLER_SOUND_PATTERN: Lazy<Regex> = Lazy::new(|| {
@@ -335,7 +484,11 @@ fn is_uppercase_acronym(text: &str) -> bool {
 
     // Retain the established cleanup for these unambiguous filler renderings;
     // other all-uppercase tokens are treated conservatively as abbreviations.
-    looks_like_acronym && !matches!(text, "UH" | "UHM")
+    looks_like_acronym
+        && !matches!(
+            text,
+            "UH" | "UHM" | "ЭМ" | "ХМ" | "ММ" | "КХМ" | "МГМ" | "ЕМ"
+        )
 }
 
 fn collect_removal_matches(
@@ -410,6 +563,19 @@ fn clean_removed_boundary(text: &mut String, boundary: usize) {
         }
     }
 
+    // ASR commonly surrounds a hesitation with two commas:
+    // "I was, um, thinking". Once the filler and its trailing comma are gone,
+    // the leading comma is redundant before a lowercase continuation. Retain
+    // it before an uppercase token ("Well, um, I think") where it may still
+    // represent a real clause/discourse boundary.
+    if removed_right_soft_punctuation && right.chars().next().is_some_and(char::is_lowercase) {
+        if let Some((index, character)) = left.char_indices().next_back() {
+            if is_soft_punctuation(character) {
+                left = trim_horizontal_end(&left[..index]);
+            }
+        }
+    }
+
     let right_starts_with_sentence_punctuation =
         right.chars().next().is_some_and(is_sentence_punctuation);
     let boundary_needs_space = (had_horizontal_gap || removed_right_soft_punctuation)
@@ -470,6 +636,7 @@ pub fn filter_transcription_output(
     lang: &str,
     custom_filler_words: &Option<Vec<String>>,
 ) -> String {
+    let lang = resolve_filler_language(lang, text);
     let mut removal_ranges = Vec::new();
     collect_removal_matches(
         &mut removal_ranges,
@@ -484,38 +651,20 @@ pub fn filter_transcription_output(
         true,
     );
 
-    // Build filler patterns from custom list or language defaults
-    let (patterns, preserve_uppercase_acronyms): (Vec<Regex>, bool) = match custom_filler_words {
-        Some(words) => (
-            words
-                .iter()
-                .filter_map(|word| {
-                    let word = word.trim();
-                    (!word.is_empty())
-                        .then(|| Regex::new(&format!(r"(?iu)\b{}\b", regex::escape(word))).ok())
-                        .flatten()
-                })
-                .collect(),
-            false,
-        ),
-        None => (
-            get_filler_words_for_language(lang)
-                .iter()
-                .map(|word| Regex::new(&format!(r"(?iu)\b{}\b", regex::escape(word))).unwrap())
-                .collect(),
-            true,
-        ),
-    };
-
-    // User-provided fillers are explicit, but built-in heuristics must not
-    // consume all-uppercase abbreviations such as ER, ERR, or AAA.
-    for pattern in &patterns {
-        collect_removal_matches(
-            &mut removal_ranges,
-            text,
-            pattern,
-            preserve_uppercase_acronyms,
-        );
+    match custom_filler_words {
+        Some(words) => {
+            for pattern in words.iter().filter_map(|word| {
+                let word = word.trim();
+                (!word.is_empty())
+                    .then(|| Regex::new(&format!(r"(?iu)\b{}\b", regex::escape(word))).ok())
+                    .flatten()
+            }) {
+                collect_removal_matches(&mut removal_ranges, text, &pattern, false);
+            }
+        }
+        None => {
+            collect_builtin_filler_matches(&mut removal_ranges, text, lang);
+        }
     }
 
     let mut filtered = remove_ranges_with_boundary_cleanup(text, removal_ranges);
@@ -615,7 +764,7 @@ mod tests {
     fn test_filter_combined() {
         let text = "  Uhm, so I was, uh, thinking about this  ";
         let result = filter_transcription_output(text, "en", &None);
-        assert_eq!(result, "so I was, thinking about this");
+        assert_eq!(result, "so I was thinking about this");
     }
 
     #[test]
@@ -644,6 +793,41 @@ mod tests {
         let text = "So uhhh this is эээ useful";
         let result = filter_transcription_output(text, "auto", &None);
         assert_eq!(result, "So this is useful");
+    }
+
+    #[test]
+    fn test_filter_auto_detects_cyrillic_fillers() {
+        let text = "ЭМ, это, э, должно работать, хм, всегда";
+        let result = filter_transcription_output(text, "auto", &None);
+        assert_eq!(result, "это должно работать всегда");
+    }
+
+    #[test]
+    fn test_filter_canonicalizes_unseen_filler_renderings() {
+        let text = "Эээээмммм, это ааааххх, пример ыыы и э-э-м";
+        let result = filter_transcription_output(text, "auto", &None);
+        assert_eq!(result, "это пример и");
+    }
+
+    #[test]
+    fn test_filter_canonicalizes_unseen_english_renderings() {
+        let text = "Uhhhhhhhh, this is ummmmmmmmm, still eeeerrrr fine";
+        let result = filter_transcription_output(text, "en", &None);
+        assert_eq!(result, "this is still fine");
+    }
+
+    #[test]
+    fn test_filter_preserves_elongated_ordinary_words() {
+        let text = "Это длиииинный текст and heyyy noooo";
+        let result = filter_transcription_output(text, "auto", &None);
+        assert_eq!(result, text);
+    }
+
+    #[test]
+    fn test_filter_does_not_reduce_canonical_mmm_to_letter_m() {
+        let text = "Use m as the variable";
+        let result = filter_transcription_output(text, "en", &None);
+        assert_eq!(result, text);
     }
 
     #[test]

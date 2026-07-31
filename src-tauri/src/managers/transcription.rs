@@ -1078,7 +1078,7 @@ impl TranscriptionManager {
         let settings = get_settings(&self.app_handle);
         // Streaming models do not receive a decode prompt, so custom words
         // always go through the shared fuzzy post-correction path.
-        let filtered = post_process_transcription_text(raw, &settings, false);
+        let filtered = post_process_transcription_text(raw, &settings, false, None);
 
         self.maybe_unload_immediately("streaming transcription");
         Ok(Some(filtered))
@@ -1228,7 +1228,7 @@ impl TranscriptionManager {
                 );
             }
 
-            let transcribe_result = catch_unwind(AssertUnwindSafe(|| -> Result<String> {
+            let transcribe_result = catch_unwind(AssertUnwindSafe(|| -> Result<RawText> {
                 match &mut engine {
                     LoadedEngine::TranscribeCpp(session) => {
                         // Custom words become the initial prompt ONLY for models
@@ -1269,7 +1269,10 @@ impl TranscriptionManager {
 
                         session
                             .run(&audio, &run_options)
-                            .map(|t| t.text)
+                            .map(|transcript| RawText {
+                                text: transcript.text,
+                                language: transcript.language,
+                            })
                             .map_err(|e| {
                                 anyhow::anyhow!("transcribe-cpp transcription failed: {}", e)
                             })
@@ -1281,16 +1284,16 @@ impl TranscriptionManager {
                         };
                         parakeet_engine
                             .transcribe_with(&audio, &params)
-                            .map(|r| r.text)
+                            .map(|result| RawText::without_language(result.text))
                             .map_err(|e| anyhow::anyhow!("Parakeet transcription failed: {}", e))
                     }
                     LoadedEngine::Moonshine(moonshine_engine) => moonshine_engine
                         .transcribe(&audio, &TranscribeOptions::default())
-                        .map(|r| r.text)
+                        .map(|result| RawText::without_language(result.text))
                         .map_err(|e| anyhow::anyhow!("Moonshine transcription failed: {}", e)),
                     LoadedEngine::MoonshineStreaming(streaming_engine) => streaming_engine
                         .transcribe(&audio, &TranscribeOptions::default())
-                        .map(|r| r.text)
+                        .map(|result| RawText::without_language(result.text))
                         .map_err(|e| {
                             anyhow::anyhow!("Moonshine streaming transcription failed: {}", e)
                         }),
@@ -1309,12 +1312,12 @@ impl TranscriptionManager {
                         };
                         sense_voice_engine
                             .transcribe_with(&audio, &params)
-                            .map(|r| r.text)
+                            .map(|result| RawText::without_language(result.text))
                             .map_err(|e| anyhow::anyhow!("SenseVoice transcription failed: {}", e))
                     }
                     LoadedEngine::GigaAM(gigaam_engine) => gigaam_engine
                         .transcribe(&audio, &TranscribeOptions::default())
-                        .map(|r| r.text)
+                        .map(|result| RawText::without_language(result.text))
                         .map_err(|e| anyhow::anyhow!("GigaAM transcription failed: {}", e)),
                     LoadedEngine::Canary(canary_engine) => {
                         let lang = if validated_language == "auto" {
@@ -1329,7 +1332,7 @@ impl TranscriptionManager {
                         };
                         canary_engine
                             .transcribe(&audio, &options)
-                            .map(|r| r.text)
+                            .map(|result| RawText::without_language(result.text))
                             .map_err(|e| anyhow::anyhow!("Canary transcription failed: {}", e))
                     }
                     LoadedEngine::Cohere(cohere_engine) => {
@@ -1344,7 +1347,7 @@ impl TranscriptionManager {
                         };
                         cohere_engine
                             .transcribe(&audio, &options)
-                            .map(|r| r.text)
+                            .map(|result| RawText::without_language(result.text))
                             .map_err(|e| anyhow::anyhow!("Cohere transcription failed: {}", e))
                     }
                 }
@@ -1398,7 +1401,12 @@ impl TranscriptionManager {
         // family). We don't pass a prompt to non-whisper models (it requires the
         // whisper-kind run extension), so they still get fuzzy correction here,
         // same as the ONNX engines.
-        let filtered_result = post_process_transcription_text(result, &settings, model_is_whisper);
+        let filtered_result = post_process_transcription_text(
+            result.text,
+            &settings,
+            model_is_whisper,
+            result.language.as_deref(),
+        );
 
         let et = std::time::Instant::now();
         let translation_note = if settings.translate_to_english {
@@ -1575,6 +1583,20 @@ struct TranscribeCppRunPlan {
     target_language: Option<String>,
 }
 
+struct RawText {
+    text: String,
+    language: Option<String>,
+}
+
+impl RawText {
+    fn without_language(text: String) -> Self {
+        Self {
+            text,
+            language: None,
+        }
+    }
+}
+
 /// Build the transcribe-cpp language/task options shared by batch and live
 /// streaming paths.
 fn transcribe_cpp_run_plan(
@@ -1609,6 +1631,7 @@ fn post_process_transcription_text(
     raw: String,
     settings: &AppSettings,
     custom_words_already_prompted: bool,
+    detected_language: Option<&str>,
 ) -> String {
     fail_open_text_transform(raw, |raw| {
         let corrected = if !settings.custom_words.is_empty() && !custom_words_already_prompted {
@@ -1622,11 +1645,12 @@ fn post_process_transcription_text(
         };
 
         if settings.remove_filler_sounds {
-            filter_transcription_output(
-                &corrected,
-                &settings.selected_language,
-                &settings.custom_filler_words,
-            )
+            let filler_language = if settings.translate_to_english {
+                "en"
+            } else {
+                detected_language.unwrap_or(&settings.selected_language)
+            };
+            filter_transcription_output(&corrected, filler_language, &settings.custom_filler_words)
         } else {
             corrected
         }
@@ -2032,8 +2056,12 @@ mod tests {
         let mut settings = crate::settings::get_default_settings();
         settings.selected_language = "en".to_string();
 
-        let result =
-            post_process_transcription_text("Um, this is uhhh ready".to_string(), &settings, false);
+        let result = post_process_transcription_text(
+            "Um, this is uhhh ready".to_string(),
+            &settings,
+            false,
+            None,
+        );
 
         assert_eq!(result, "this is ready");
     }
@@ -2045,9 +2073,47 @@ mod tests {
         settings.remove_filler_sounds = false;
 
         let raw = "Um, this is uhhh ready".to_string();
-        let result = post_process_transcription_text(raw.clone(), &settings, false);
+        let result = post_process_transcription_text(raw.clone(), &settings, false, None);
 
         assert_eq!(result, raw);
+    }
+
+    #[test]
+    fn post_processing_uses_the_model_detected_language_in_auto_mode() {
+        let mut settings = crate::settings::get_default_settings();
+        settings.selected_language = "auto".to_string();
+
+        let english = post_process_transcription_text(
+            "Um, this works".to_string(),
+            &settings,
+            false,
+            Some("en"),
+        );
+        let portuguese = post_process_transcription_text(
+            "um gato bonito".to_string(),
+            &settings,
+            false,
+            Some("pt"),
+        );
+
+        assert_eq!(english, "this works");
+        assert_eq!(portuguese, "um gato bonito");
+    }
+
+    #[test]
+    fn post_processing_filters_the_translation_target_language() {
+        let mut settings = crate::settings::get_default_settings();
+        settings.selected_language = "auto".to_string();
+        settings.translate_to_english = true;
+
+        let result = post_process_transcription_text(
+            "Um, this is translated".to_string(),
+            &settings,
+            false,
+            Some("ru"),
+        );
+
+        assert_eq!(result, "this is translated");
     }
 
     #[test]
