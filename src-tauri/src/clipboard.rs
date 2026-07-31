@@ -321,6 +321,14 @@ fn wayland_dispatch_outcome() -> ClipboardPasteOutcome {
     ClipboardPasteOutcome::DispatchedUnverified
 }
 
+fn should_use_direct_text_transport(is_macos: bool, paste_method: &PasteMethod) -> bool {
+    is_macos
+        && matches!(
+            paste_method,
+            PasteMethod::CtrlV | PasteMethod::CtrlShiftV | PasteMethod::ShiftInsert
+        )
+}
+
 #[cfg(any(target_os = "linux", test))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum LinuxProviderState {
@@ -837,6 +845,18 @@ fn paste_via_clipboard(
     paste_delay_ms: u64,
     paste_delay_after_ms: u64,
 ) -> Result<ClipboardPasteOutcome, String> {
+    // macOS can inject arbitrary Unicode directly through CGEvent. Using that
+    // transport for the clipboard-style methods avoids touching the user's
+    // pasteboard at all, so there is no publication/restoration race and no
+    // accessibility-value heuristic that can turn a successful paste into an
+    // error. CopyToClipboard is still applied explicitly after successful
+    // delivery by `paste`.
+    if should_use_direct_text_transport(cfg!(target_os = "macos"), paste_method) {
+        info!("Using clipboard-independent Unicode text injection on macOS");
+        input::paste_text_direct(enigo, text)?;
+        return Ok(ClipboardPasteOutcome::Confirmed);
+    }
+
     let clipboard = app_handle.clipboard();
 
     #[cfg(target_os = "linux")]
@@ -1681,6 +1701,24 @@ mod tests {
             PasteMethod::Direct,
             &ClipboardPasteOutcome::Confirmed
         ));
+    }
+
+    #[test]
+    fn macos_clipboard_methods_never_use_the_clipboard_as_transport() {
+        for method in [
+            PasteMethod::CtrlV,
+            PasteMethod::CtrlShiftV,
+            PasteMethod::ShiftInsert,
+        ] {
+            assert!(should_use_direct_text_transport(true, &method));
+            assert!(!should_use_direct_text_transport(false, &method));
+        }
+
+        assert!(!should_use_direct_text_transport(
+            true,
+            &PasteMethod::Direct
+        ));
+        assert!(!should_use_direct_text_transport(true, &PasteMethod::None));
     }
 
     #[test]
