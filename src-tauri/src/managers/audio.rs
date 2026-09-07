@@ -366,8 +366,10 @@ impl AudioRecordingManager {
     /* ---------- helper methods --------------------------------------------- */
 
     /// The microphone name the settings ask for, or `None` for the system
-    /// default. Only runs the clamshell probe (an `ioreg` subprocess, ~10-20ms)
-    /// when a clamshell microphone is actually configured.
+    /// default. A configured name is strict: if it is unavailable, recording
+    /// must fail instead of silently falling back to the system default.
+    /// Only runs the clamshell probe (an `ioreg` subprocess, ~10-20ms) when a
+    /// clamshell microphone is actually configured.
     fn desired_device_name(&self, settings: &AppSettings) -> Option<String> {
         if settings.clamshell_microphone.is_some() {
             let clamshell_started = Instant::now();
@@ -388,12 +390,15 @@ impl AudioRecordingManager {
         *self.cached_device.lock().unwrap() = None;
     }
 
-    fn get_effective_microphone_device(&self, settings: &AppSettings) -> Option<cpal::Device> {
+    fn get_effective_microphone_device(
+        &self,
+        settings: &AppSettings,
+    ) -> Result<Option<cpal::Device>, anyhow::Error> {
         let device_name = match self.desired_device_name(settings) {
             Some(name) => name,
             None => {
                 debug!("device resolve: no mic configured -> system default");
-                return None;
+                return Ok(None);
             }
         };
 
@@ -402,31 +407,37 @@ impl AudioRecordingManager {
         if let Some((cached_name, device)) = self.cached_device.lock().unwrap().as_ref() {
             if *cached_name == device_name {
                 debug!("device resolve: cache hit for '{}'", device_name);
-                return Some(device.clone());
+                return Ok(Some(device.clone()));
             }
         }
 
         // Find the device by name
         let enumerate_started = Instant::now();
-        let device = match list_input_devices() {
-            Ok(devices) => devices
-                .into_iter()
-                .find(|d| d.name == device_name)
-                .map(|d| d.device),
-            Err(e) => {
-                debug!("Failed to list devices, using default: {}", e);
-                None
-            }
-        };
+        let device = list_input_devices()
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "Unable to find selected microphone '{}': failed to list input devices: {}",
+                    device_name,
+                    e
+                )
+            })?
+            .into_iter()
+            .find(|d| d.name == device_name)
+            .map(|d| d.device);
         debug!(
             "device resolve: enumerate={:?} (found={})",
             enumerate_started.elapsed(),
             device.is_some()
         );
-        if let Some(d) = &device {
-            *self.cached_device.lock().unwrap() = Some((device_name, d.clone()));
-        }
-        device
+        let device = device.ok_or_else(|| {
+            anyhow::anyhow!(
+                "Selected microphone '{}' is unavailable. Connect it or choose Auto in Handy settings.",
+                device_name
+            )
+        })?;
+
+        *self.cached_device.lock().unwrap() = Some((device_name, device.clone()));
+        Ok(Some(device))
     }
 
     fn schedule_lazy_close(&self) {
@@ -537,13 +548,13 @@ impl AudioRecordingManager {
         }
 
         // Get the selected device from settings, considering clamshell mode.
-        // No pre-flight enumeration here: when nothing is configured the
-        // recorder resolves the system default itself, and a machine with no
-        // input devices at all fails inside open() with the same
-        // "No input device found" error this used to check for.
+        // When nothing is configured, the recorder resolves the system default
+        // itself. An explicit microphone is resolved strictly above, so a
+        // disconnected selected device never turns into an accidental default
+        // (possibly a headset) microphone.
         let settings = get_settings(&self.app_handle);
         let resolve_started = Instant::now();
-        let selected_device = self.get_effective_microphone_device(&settings);
+        let selected_device = self.get_effective_microphone_device(&settings)?;
         let resolve_elapsed = resolve_started.elapsed();
 
         // Ensure VAD is loaded if it wasn't for whatever reason
@@ -560,7 +571,7 @@ impl AudioRecordingManager {
                 // retry once before surfacing the error.
                 warn!("Recorder open failed ({first_err}); re-resolving device and retrying once");
                 self.invalidate_device_cache();
-                let fresh_device = self.get_effective_microphone_device(&settings);
+                let fresh_device = self.get_effective_microphone_device(&settings)?;
                 rec.open(fresh_device)
                     .map_err(|e| anyhow::anyhow!("Failed to open recorder: {}", e))?;
             }

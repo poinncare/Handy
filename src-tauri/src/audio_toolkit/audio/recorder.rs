@@ -466,6 +466,7 @@ pub fn is_microphone_access_denied(error_message: &str) -> bool {
 pub fn is_no_input_device_error(error_message: &str) -> bool {
     let normalized = error_message.to_lowercase();
     normalized.contains("no input device found")
+        || normalized.contains("selected microphone")
         || (normalized.contains("failed to fetch preferred config")
             && normalized.contains("coreaudio"))
 }
@@ -497,6 +498,13 @@ mod tests {
     #[test]
     fn detects_no_input_device() {
         assert!(is_no_input_device_error("No input device found"));
+    }
+
+    #[test]
+    fn detects_unavailable_selected_microphone() {
+        assert!(is_no_input_device_error(
+            "Selected microphone 'MacBook Pro Microphone' is unavailable."
+        ));
     }
 
     #[test]

@@ -220,7 +220,7 @@
       "title": "Sound",
       "microphone": {
         "title": "Microphone",
-        "description": "Select your preferred microphone device",
+        "description": "Auto follows the system microphone. Select a device to always use it, even when other microphones are connected.",
         "placeholder": "Select microphone...",
         "loading": "Loading..."
       },
@@ -621,7 +621,7 @@
       "linux": "Grant microphone access in your system's sound or privacy settings."
     },
     "noInputDeviceTitle": "No Microphone Found",
-    "noInputDevice": "No audio input device was detected. Please connect a microphone or headset and try again.",
+    "noInputDevice": "No audio input device was detected, or the selected microphone is unavailable. Connect it or choose Auto in Handy settings and try again.",
     "recordingFailed": "Failed to start recording: {{error}}",
     "modelLoadFailed": "Failed to load model: {{model}}",
     "modelLoadFailedUnknown": "unknown model",
