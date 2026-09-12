@@ -269,7 +269,7 @@ jobs:
         if: ${{ !inputs.sign-binaries }}
         shell: bash
         run: |
-          jq '.bundle.createUpdaterArtifacts = false' src-tauri/tauri.conf.json > tmp.json
+          jq 'del(.bundle.macOS.signingIdentity, .bundle.windows.signCommand) | .bundle.createUpdaterArtifacts = false' src-tauri/tauri.conf.json > tmp.json
           mv tmp.json src-tauri/tauri.conf.json
 
       # ggml refuses to build its ARM CPU backend under MSVC (upstream check in
