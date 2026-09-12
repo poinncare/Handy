@@ -10,6 +10,8 @@ jobs:
     outputs:
       release-id: ${{ steps.create-release.outputs.result }}
       version: ${{ steps.get-version.outputs.version }}
+      release-tag: ${{ steps.get-version.outputs.release-tag }}
+      release-name: ${{ steps.get-version.outputs.release-name }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -19,8 +21,16 @@ jobs:
         shell: bash
         run: |
           VERSION=$(grep -o '"version": "[^"]*"' src-tauri/tauri.conf.json | cut -d'"' -f4)
+          PRODUCT_NAME=$(grep -o '"productName": "[^"]*"' src-tauri/tauri.conf.json | cut -d'"' -f4)
+          if [[ "$GITHUB_REF_NAME" == "memory-training" ]]; then
+            RELEASE_TAG="v${VERSION}-memory-training"
+          else
+            RELEASE_TAG="v${VERSION}"
+          fi
           echo "Application version from tauri.conf.json: $VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "release-tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          echo "release-name=${PRODUCT_NAME} v${VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Create Draft Release
         id: create-release
@@ -30,8 +40,9 @@ jobs:
             const { data } = await github.rest.repos.createRelease({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              tag_name: `v${{ steps.get-version.outputs.version }}`,
-              name: `v${{ steps.get-version.outputs.version }}`,
+              tag_name: `${{ steps.get-version.outputs.release-tag }}`,
+              name: `${{ steps.get-version.outputs.release-name }}`,
+              target_commitish: context.sha,
               draft: true,
               prerelease: false,
               generate_release_notes: true
@@ -73,10 +84,12 @@ jobs:
       platform: ${{ matrix.platform }}
       target: ${{ matrix.target }}
       build-args: ${{ matrix.args }}
-      sign-binaries: true
+      sign-binaries: false
       asset-prefix: "handy"
       upload-artifacts: false
       release-id: ${{ needs.create-release.outputs.release-id }}
+      release-tag: ${{ needs.create-release.outputs.release-tag }}
+      release-name: ${{ needs.create-release.outputs.release-name }}
       # Releases always build from scratch — never restore the Rust cache, so a
       # stale cached native lib can never be linked into a shipped artifact.
       no-cache: true
