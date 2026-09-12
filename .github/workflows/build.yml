@@ -508,23 +508,35 @@ jobs:
           sudo cp -vL "$LIBDIR"/libtranscribe.so* "$LIBDIR"/libggml*.so* /usr/local/lib/ 2>/dev/null || true
           sudo ldconfig
 
-      - name: Build with Tauri
+      - name: Build with Tauri (signed)
+        if: inputs.sign-binaries
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ${{ if inputs.sign-binaries }}:
-            APPLE_ID: ${{ secrets.APPLE_ID }}
-            APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
-            APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-            APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-            APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-            APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-            APPLE_SIGNING_IDENTITY: ${{ env.CERT_ID }}
-            AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-            AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-            AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-            TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-            TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ env.CERT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ inputs.release-tag }}
+          releaseName: ${{ inputs.release-name }}
+          releaseId: ${{ inputs.release-id }}
+          assetNamePattern: ${{ steps.patch-release-name.outputs.platform }}
+          args: ${{ inputs.build-args }}
+
+      - name: Build with Tauri (unsigned)
+        if: ${{ !inputs.sign-binaries }}
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ inputs.release-tag }}
           releaseName: ${{ inputs.release-name }}
